@@ -23,7 +23,15 @@ const upload = multer({
 });
 
 async function start() {
-  await connectMongo();
+  // Warm the Mongo connection in the background; don't block boot on it. Audit
+  // logging lives in MongoDB but a Mongo outage must not stop the API from
+  // serving — writeAuditLog reconnects per write and fails soft.
+  connectMongo().catch((err) =>
+    console.error(
+      "[startup] MongoDB not ready — audit logging will retry:",
+      err.message
+    )
+  );
 
   const app = express();
   const server = new ApolloServer({ typeDefs, resolvers });

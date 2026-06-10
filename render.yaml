@@ -1,0 +1,45 @@
+# Render blueprint for InfraSure ERP — API + AI engine + managed PostgreSQL.
+# Deploy: push to GitHub, then in Render "New +" → "Blueprint" and pick this repo.
+#
+# Notes:
+#  - MongoDB is not a Render-managed service: create a free MongoDB Atlas cluster
+#    and set MONGO_URL on the API service (marked sync:false below).
+#  - AI_ENGINE_URL is optional; the API degrades gracefully if it's unset/unreachable.
+#    Set it to the AI engine service URL (e.g. https://infrasure-ai-engine.onrender.com).
+databases:
+  - name: infrasure-postgres
+    databaseName: infrasure_erp
+    user: infrasure
+    plan: free
+
+services:
+  - type: web
+    name: infrasure-ai-engine
+    runtime: docker
+    plan: free
+    dockerfilePath: services/ai-engine/Dockerfile
+    dockerContext: services/ai-engine
+    healthCheckPath: /health
+
+  - type: web
+    name: infrasure-api
+    runtime: docker
+    plan: free
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "4000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: infrasure-postgres
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # Create a MongoDB Atlas cluster and paste its connection string here.
+      - key: MONGO_URL
+        sync: false
+      # Optional: set to the AI engine's public URL to enable AI insights.
+      - key: AI_ENGINE_URL
+        sync: false
