@@ -13,6 +13,7 @@ const NAV_BY_ROLE = {
     "portfolio",
     "compliance",
     "audit",
+    "ai",
     "contracts",
     "finance",
     "safety",
@@ -22,11 +23,13 @@ const NAV_BY_ROLE = {
     "vendors",
     "disputes",
     "billing",
+    "integrations",
   ],
   PROJECT_MANAGER: [
     "portfolio",
     "compliance",
     "audit",
+    "ai",
     "contracts",
     "finance",
     "rera",
@@ -36,6 +39,7 @@ const NAV_BY_ROLE = {
   COMPLIANCE_OFFICER: [
     "compliance",
     "audit",
+    "ai",
     "contracts",
     "safety",
     "environment",
@@ -44,8 +48,8 @@ const NAV_BY_ROLE = {
     "vendors",
     "disputes",
   ],
-  ACCOUNTANT: ["compliance", "audit", "finance", "labour"],
-  ENGINEER: ["safety", "environment", "contracts"],
+  ACCOUNTANT: ["compliance", "audit", "ai", "finance", "labour"],
+  ENGINEER: ["safety", "environment", "contracts", "ai"],
 };
 
 function Login({ onLogin }) {
@@ -168,6 +172,8 @@ function Dashboard({ session, onLogout }) {
     subscription: null,
     audit: null,
     kpis: null,
+    ai: null,
+    integrations: [],
   });
   const [err, setErr] = useState("");
   const [reload, setReload] = useState(0);
@@ -190,6 +196,8 @@ function Dashboard({ session, onLogout }) {
         subscription: null,
         audit: null,
         kpis: null,
+        ai: null,
+        integrations: [],
       };
       const safe = (p, fb) => p.then((d) => d).catch(() => fb);
 
@@ -317,6 +325,26 @@ function Dashboard({ session, onLogout }) {
           );
           out.tiers = tiers.getBillingTiers || [];
         }
+        if (tabs.includes("ai") || tabs.includes("portfolio")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getAIInsights(tenant_id:$t){available predictive_score risk_level weak_factors anomalies{finance_id type severity detail}}}`,
+              { t }
+            ),
+            { getAIInsights: null }
+          );
+          out.ai = d.getAIInsights;
+        }
+        if (tabs.includes("integrations")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getIntegrationStatus(tenant_id:$t){integration configured driver}}`,
+              { t }
+            ),
+            { getIntegrationStatus: [] }
+          );
+          out.integrations = d.getIntegrationStatus || [];
+        }
         setData(out);
       } catch (e) {
         setErr(e.message);
@@ -363,6 +391,27 @@ function Dashboard({ session, onLogout }) {
         { t: user.tenant_id, p: plan }
       );
       setCheckout(d.createBillingCheckout);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  const [integrationMsg, setIntegrationMsg] = useState("");
+
+  // Runs an integration mutation (no args beyond tenant) and shows the result line.
+  async function runIntegration(mutationField) {
+    setErr("");
+    setIntegrationMsg("");
+    try {
+      const d = await gql(
+        `mutation($t:ID!){${mutationField}(tenant_id:$t){integration status detail driver reference}}`,
+        { t: user.tenant_id }
+      );
+      const r = d[mutationField];
+      setIntegrationMsg(
+        `${r.integration} [${r.driver}] ${r.status}: ${r.detail} (ref ${r.reference})`
+      );
+      refresh();
     } catch (e) {
       setErr(e.message);
     }
@@ -952,6 +1001,140 @@ function Dashboard({ session, onLogout }) {
                 );
               })}
             </div>
+          </Card>
+        )}
+
+        {tab === "ai" && (
+          <Card title="AI Compliance Insights" wide>
+            {!data.ai ? (
+              <p className="text-sm text-slate-500">No insights.</p>
+            ) : !data.ai.available ? (
+              <p className="text-sm text-amber-600">
+                AI engine is offline — insights unavailable. Start the
+                <code className="mx-1 bg-slate-100 px-1 rounded">ai-engine</code>
+                service to enable predictive scoring and anomaly detection.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <Kpi
+                    label="Predictive score"
+                    value={data.ai.predictive_score ?? 0}
+                  />
+                  <div className="bg-slate-50 rounded-lg p-4">
+                    <p className="text-xs text-slate-500">Risk level</p>
+                    <p
+                      className={`text-2xl font-bold ${
+                        data.ai.risk_level === "LOW"
+                          ? "text-emerald-600"
+                          : data.ai.risk_level === "MEDIUM"
+                          ? "text-amber-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {data.ai.risk_level}
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4">
+                    <p className="text-xs text-slate-500">Anomalies</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      {data.ai.anomalies.length}
+                    </p>
+                  </div>
+                </div>
+                {data.ai.weak_factors.length > 0 && (
+                  <p className="text-sm text-slate-600">
+                    Weak factors: {data.ai.weak_factors.join(", ")}
+                  </p>
+                )}
+                {data.ai.anomalies.length > 0 && (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-slate-400">
+                        <th className="py-1">Type</th>
+                        <th>Severity</th>
+                        <th>Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.ai.anomalies.map((a, i) => (
+                        <tr key={i} className="border-t">
+                          <td className="py-2">{a.type}</td>
+                          <td
+                            className={
+                              a.severity === "HIGH"
+                                ? "text-red-600 font-medium"
+                                : "text-amber-600"
+                            }
+                          >
+                            {a.severity}
+                          </td>
+                          <td className="text-slate-600">{a.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {tab === "integrations" && (
+          <Card title="External Integrations" wide>
+            {integrationMsg && (
+              <p className="text-sm mb-4 bg-slate-100 text-slate-700 rounded p-3">
+                {integrationMsg}
+              </p>
+            )}
+            <table className="w-full text-sm mb-4">
+              <thead>
+                <tr className="text-left text-slate-400">
+                  <th className="py-1">Integration</th>
+                  <th>Driver</th>
+                  <th>Configured</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.integrations.map((i) => (
+                  <tr key={i.integration} className="border-t">
+                    <td className="py-2">{i.integration}</td>
+                    <td>{i.driver}</td>
+                    <td>
+                      {i.configured ? (
+                        <span className="text-emerald-600">live</span>
+                      ) : (
+                        <span className="text-amber-600">stub</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => runIntegration("syncTallyLedger")}
+                className="bg-slate-800 text-white rounded px-3 py-2 text-sm hover:bg-slate-700"
+              >
+                Sync Tally/SAP
+              </button>
+              <button
+                onClick={() => runIntegration("syncReraUpdates")}
+                className="bg-slate-800 text-white rounded px-3 py-2 text-sm hover:bg-slate-700"
+              >
+                Sync RERA updates
+              </button>
+              <button
+                onClick={() => runIntegration("importBimModel")}
+                className="bg-slate-800 text-white rounded px-3 py-2 text-sm hover:bg-slate-700"
+              >
+                Import BIM model
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mt-3">
+              GST e-filing and Aadhaar e-Sign run per-record from the Finance and
+              Contracts screens.
+            </p>
           </Card>
         )}
       </main>

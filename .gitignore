@@ -11,3 +11,6 @@ coverage/
 .idea/
 packages/db/prisma/migrations/dev.db*
 uploads/
+__pycache__/
+*.pyc
+.expo/

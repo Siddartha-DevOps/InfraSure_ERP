@@ -143,6 +143,37 @@ export const typeDefs = /* GraphQL */ `
     driver: String!
   }
 
+  # --- Phase 4: AI engine ---
+  type AIAnomaly {
+    finance_id: ID
+    type: String!
+    severity: String!
+    detail: String!
+  }
+
+  type AIInsights {
+    available: Boolean!
+    predictive_score: Float
+    risk_level: String!
+    weak_factors: [String!]!
+    anomalies: [AIAnomaly!]!
+  }
+
+  # --- Phase 4: External integrations ---
+  type IntegrationStatus {
+    integration: String!
+    configured: Boolean!
+    driver: String!
+  }
+
+  type IntegrationResult {
+    integration: String!
+    status: String!
+    driver: String!
+    reference: String!
+    detail: String!
+  }
+
   # Phase 3 audit-readiness rollup.
   type AuditReadiness {
     documents_verified: Int!
@@ -209,6 +240,10 @@ export const typeDefs = /* GraphQL */ `
     getSubscription(tenant_id: ID!): Subscription
     getBillingTiers: [BillingTier!]!
     getAuditReadiness(tenant_id: ID!): AuditReadiness!
+
+    # --- Phase 4 ---
+    getAIInsights(tenant_id: ID!): AIInsights!
+    getIntegrationStatus(tenant_id: ID!): [IntegrationStatus!]!
   }
 
   type Mutation {
@@ -303,5 +338,12 @@ export const typeDefs = /* GraphQL */ `
     # --- Phase 3: Billing ---
     changeSubscriptionPlan(tenant_id: ID!, plan_type: String!): Subscription!
     createBillingCheckout(tenant_id: ID!, plan_type: String!): CheckoutSession!
+
+    # --- Phase 4: External integrations ---
+    syncTallyLedger(tenant_id: ID!): IntegrationResult!
+    fileGSTReturn(tenant_id: ID!, finance_id: ID!): IntegrationResult!
+    syncReraUpdates(tenant_id: ID!): IntegrationResult!
+    requestAadhaarESign(tenant_id: ID!, contract_id: ID!): IntegrationResult!
+    importBimModel(tenant_id: ID!, url: String): IntegrationResult!
   }
 `;

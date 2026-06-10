@@ -114,6 +114,28 @@ Built on Phases 1–2; same architecture, no rework.
   audit-logged to MongoDB.
 - **Seed:** sample vendors (incl. an expiring certification) and disputes.
 
+## 6d. Phase 4 — concrete deliverable (Advanced)
+
+Built on Phases 1–3; same architecture, no rework. Three pillars:
+
+- **Python AI engine** (`services/ai-engine`, FastAPI): anomaly detection (robust
+  MAD-based outlier + overdue-unpaid signals), weighted predictive **compliance scoring**
+  with risk level + weak factors, and an OCR stub. Wired into GraphQL via `getAIInsights`,
+  which degrades gracefully (`available: false`) if the service is down. Added to
+  `docker-compose`; dependency-free core logic with its own tests.
+- **External integrations** (`apps/api/src/integrations`): adapter layer for **Tally/SAP,
+  GST portal, RERA, Aadhaar e-sign, BIM** — stub-by-default, marked "live" once each
+  credential env var is set. GraphQL: `getIntegrationStatus` + mutations `syncTallyLedger`,
+  `fileGSTReturn`, `syncReraUpdates`, `requestAadhaarESign`, `importBimModel` (all
+  audit-logged).
+- **React Native field app** (`apps/mobile`, Expo): login, **geo-tagged DPRs**
+  (`expo-location`), site photos (`expo-image-picker`), and an **offline-first queue**
+  (`AsyncStorage`) that flushes `createDPR` when back online. *Scaffolded; not built through
+  the RN toolchain in this repo's checks.*
+- **Web:** role-aware **AI Insights** tab (score, risk, anomalies) and an admin
+  **Integrations** tab (status + run actions).
+- **RBAC + audit:** every new query/mutation is role-gated and mutations are audit-logged.
+
 ## 7. Decisions (Phase 1)
 
 - **API:** GraphQL for data/dashboard queries; REST only for file uploads.

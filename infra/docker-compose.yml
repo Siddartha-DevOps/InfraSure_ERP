@@ -30,6 +30,17 @@ services:
     ports:
       - "6379:6379"
 
+  ai-engine:
+    build: ../services/ai-engine
+    container_name: infrasure_ai_engine
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:
   mongodata:

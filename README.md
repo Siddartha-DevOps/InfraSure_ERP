@@ -12,12 +12,15 @@ full roadmap and architecture.
 ```
 infrasure-erp/
 ├── apps/
-│   ├── api/      Node.js + Express + Apollo GraphQL  (Phase 1)
-│   └── web/      React + Vite + Tailwind             (Phase 1, shell)
+│   ├── api/        Node.js + Express + Apollo GraphQL  (Phase 1)
+│   ├── web/        React + Vite + Tailwind             (Phase 1, shell)
+│   └── mobile/     React Native (Expo) field app       (Phase 4)
+├── services/
+│   └── ai-engine/  Python FastAPI AI engine            (Phase 4)
 ├── packages/
-│   └── db/       Prisma schema + migrations (PostgreSQL)
-├── infra/        docker-compose: Postgres, MongoDB, Redis
-└── docs/         PLAN.md, ARCHITECTURE.md
+│   └── db/         Prisma schema + migrations (PostgreSQL)
+├── infra/          docker-compose: Postgres, MongoDB, Redis, ai-engine
+└── docs/           PLAN.md, ARCHITECTURE.md
 ```
 
 ## Quick start (Phase 1)
@@ -80,6 +83,19 @@ All new operations are RBAC-gated per role and every mutation is audit-logged to
   (`getBillingTiers`, `getSubscription`, `changeSubscriptionPlan`, `createBillingCheckout`).
   Defaults to a **stub** driver; set `BILLING_DRIVER=stripe` + `STRIPE_SECRET_KEY` for real
   Stripe Checkout. Billing is ADMIN-only.
+
+## Phase 4 scope (Advanced)
+
+- **AI compliance engine** (`services/ai-engine`, FastAPI): anomaly detection +
+  predictive compliance scoring + OCR stub. Exposed via `getAIInsights`, which degrades
+  gracefully if the engine is offline. Run it with `docker compose up ai-engine` or
+  `uvicorn main:app` (see `services/ai-engine`).
+- **External integrations** (`apps/api/src/integrations`): Tally/SAP, GST portal, RERA,
+  Aadhaar e-sign, BIM — stub-by-default adapters, "live" once each credential is set.
+  `getIntegrationStatus` + `syncTallyLedger` / `fileGSTReturn` / `syncReraUpdates` /
+  `requestAadhaarESign` / `importBimModel`.
+- **React Native field app** (`apps/mobile`, Expo): login, geo-tagged DPRs, site photos,
+  offline-first queue. See `apps/mobile/README.md` (scaffold — run locally with Expo).
 
 ## Contract document upload (REST)
 
