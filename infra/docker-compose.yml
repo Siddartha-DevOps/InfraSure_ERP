@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: infrasure_postgres
+    environment:
+      POSTGRES_USER: infrasure
+      POSTGRES_PASSWORD: infrasure
+      POSTGRES_DB: infrasure_erp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infrasure -d infrasure_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: infrasure_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: infrasure_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
+  mongodata:

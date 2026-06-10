@@ -1,0 +1,16 @@
+{
+  "name": "infrasure-erp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "InfraSure ERP — multi-tenant construction-compliance SaaS",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace apps/api",
+    "dev:web": "npm run dev --workspace apps/web",
+    "db:setup": "npm run db:setup --workspace apps/api"
+  },
+  "license": "UNLICENSED"
+}

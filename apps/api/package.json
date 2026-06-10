@@ -1,0 +1,31 @@
+{
+  "name": "@infrasure/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "db:generate": "prisma generate --schema ../../packages/db/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema ../../packages/db/prisma/schema.prisma --name init",
+    "db:seed": "node prisma/seed.js",
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed"
+  },
+  "dependencies": {
+    "@apollo/server": "^4.11.0",
+    "@infrasure/db": "*",
+    "@prisma/client": "^5.20.0",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "graphql": "^16.9.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.9.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.20.0"
+  }
+}

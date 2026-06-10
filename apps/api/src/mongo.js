@@ -1,0 +1,37 @@
+// MongoDB connection + immutable audit-log writer for InfraSure ERP.
+import { MongoClient } from "mongodb";
+
+const MONGO_URL = process.env.MONGO_URL || "mongodb://localhost:27017";
+const MONGO_DB = process.env.MONGO_DB || "infrasure_audit";
+
+let client;
+let auditCollection;
+
+export async function connectMongo() {
+  if (auditCollection) return auditCollection;
+  client = new MongoClient(MONGO_URL);
+  await client.connect();
+  auditCollection = client.db(MONGO_DB).collection("audit_logs");
+  return auditCollection;
+}
+
+// Every mutation calls this: who (user_id) did what (action) for which tenant, when.
+export async function writeAuditLog({ tenant_id, user_id, action, metadata }) {
+  try {
+    const col = await connectMongo();
+    await col.insertOne({
+      tenant_id,
+      user_id,
+      action,
+      metadata: metadata || {},
+      timestamp: new Date(),
+    });
+  } catch (err) {
+    // Audit logging must never break the business operation; surface for ops.
+    console.error("[audit] failed to write log:", err.message);
+  }
+}
+
+export async function closeMongo() {
+  if (client) await client.close();
+}
