@@ -9,7 +9,9 @@ let auditCollection;
 
 export async function connectMongo() {
   if (auditCollection) return auditCollection;
-  client = new MongoClient(MONGO_URL);
+  // Fail fast when Mongo is unreachable so callers (and startup) don't hang on the
+  // driver's 30s default server-selection timeout.
+  client = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 3000 });
   await client.connect();
   auditCollection = client.db(MONGO_DB).collection("audit_logs");
   return auditCollection;

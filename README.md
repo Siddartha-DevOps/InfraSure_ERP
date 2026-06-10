@@ -141,8 +141,33 @@ URL returns Vercel's `404: NOT_FOUND` page.
 
 ### API (separate host)
 
-Vercel is static/serverless; the Express + Apollo API and its datastores (PostgreSQL,
-MongoDB, Redis) do **not** run there as-is. Host the API on a container/VM platform
-(Render, Railway, Fly.io, ECS, a VM, …) with those datastores provisioned, set the API's
-env vars (`DATABASE_URL`, `MONGO_URL`, `JWT_SECRET`, …), then point the web app's
-`VITE_API_URL` at it.
+Vercel is static/serverless; the Express + Apollo API and its datastores do **not** run
+there as-is. The repo ships everything needed to host the API as a container:
+
+- **`apps/api/Dockerfile`** — builds the API (build it with the **repo root as context**,
+  since it includes the `packages/db` workspace):
+  ```bash
+  docker build -f apps/api/Dockerfile -t infrasure-api .
+  docker run -p 4000:4000 \
+    -e DATABASE_URL=postgresql://… \
+    -e MONGO_URL=mongodb+srv://… \
+    -e JWT_SECRET=$(openssl rand -hex 32) \
+    infrasure-api
+  ```
+  On start it runs `prisma db push` to apply the schema, then launches the API. The API
+  boots even if MongoDB is briefly unreachable (audit logging retries and fails soft).
+
+- **`render.yaml`** — one-click [Render](https://render.com) blueprint provisioning the
+  API + the AI engine + a managed PostgreSQL. In Render: **New + → Blueprint → pick this
+  repo**. `DATABASE_URL` and `JWT_SECRET` are wired automatically; set **`MONGO_URL`** to a
+  free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster, and optionally
+  **`AI_ENGINE_URL`** to the AI engine's URL.
+
+The same image runs on Railway, Fly.io, ECS, a VM, etc. Required env vars:
+`DATABASE_URL`, `MONGO_URL`, `JWT_SECRET` (see `apps/api/.env.example` for the rest).
+
+### Wiring the web app to the hosted API
+
+Once the API is live at e.g. `https://infrasure-api.onrender.com`, set
+**`VITE_API_URL=https://infrasure-api.onrender.com/graphql`** in Vercel → Environment
+Variables and redeploy. Login and all queries will then work end-to-end.
