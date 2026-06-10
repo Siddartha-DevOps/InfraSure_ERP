@@ -11,6 +11,15 @@ import {
   signToken,
 } from "./auth.js";
 import { listTiers, createCheckoutSession, isValidPlan } from "./billing.js";
+import { getInsights } from "./ai.js";
+import {
+  integrationStatus,
+  syncTallyLedger,
+  fileGstReturnExternal,
+  syncReraUpdates,
+  requestAadhaarEsign,
+  importBimModel,
+} from "./integrations/index.js";
 
 const iso = (d) => (d instanceof Date ? d.toISOString() : d);
 
@@ -284,6 +293,63 @@ export const resolvers = {
         vendor_compliance_rate: round(vendor_compliance_rate),
         audit_readiness_score: round(score),
       };
+    },
+
+    // ---- Phase 4: AI insights ----
+    getAIInsights: async (_p, args, { user }) => {
+      authorize("getAIInsights", args, user);
+      const where = { tenant_id: args.tenant_id };
+      const [finances, safety, labour, rera] = await Promise.all([
+        prisma.finance.findMany({ where }),
+        prisma.safety.findMany({ where }),
+        prisma.labourFiling.findMany({ where }),
+        prisma.reraFiling.findMany({ where }),
+      ]);
+
+      const pct = (n, total) => (total === 0 ? 100 : (n / total) * 100);
+      const now = new Date();
+      const metrics = {
+        gst_filing_compliance: pct(
+          finances.filter((f) => f.gst_filing_status === "FILED").length,
+          finances.length
+        ),
+        tds_filing_compliance: pct(
+          finances.filter((f) => f.tds_status === "FILED").length,
+          finances.length
+        ),
+        ra_bill_approval_rate: pct(
+          finances.filter((f) => f.ra_bill_status === "APPROVED").length,
+          finances.length
+        ),
+        safety_audit_completion: pct(
+          safety.filter((s) => s.checklist_status === "COMPLETED").length,
+          safety.length
+        ),
+        pf_esi_filing_rate: pct(
+          labour.filter((l) => l.status === "FILED").length,
+          labour.length
+        ),
+        rera_filing_rate: pct(
+          rera.filter((r) => r.status === "FILED" || r.status === "APPROVED").length,
+          rera.length
+        ),
+      };
+
+      // Records the AI engine scans for anomalies (amount outliers + overdue-unpaid).
+      const records = finances.map((f) => ({
+        finance_id: f.finance_id,
+        amount: f.amount,
+        paid_date: f.paid_date ? f.paid_date.toISOString() : null,
+        overdue: !f.paid_date && new Date(f.due_date) < now,
+      }));
+
+      return getInsights({ records, metrics });
+    },
+
+    // ---- Phase 4: Integration status ----
+    getIntegrationStatus: async (_p, args, { user }) => {
+      authorize("getIntegrationStatus", args, user);
+      return integrationStatus();
     },
   },
 
@@ -833,6 +899,73 @@ export const resolvers = {
         metadata: { plan_type: args.plan_type, driver: session.driver },
       });
       return session;
+    },
+
+    // ---- Phase 4: External integrations (stub-by-default, audit-logged) ----
+    syncTallyLedger: async (_p, args, { user }) => {
+      authorize("syncTallyLedger", args, user);
+      const r = await syncTallyLedger({ tenant_id: args.tenant_id });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "syncTallyLedger",
+        metadata: { reference: r.reference, driver: r.driver },
+      });
+      return r;
+    },
+
+    fileGSTReturn: async (_p, args, { user }) => {
+      authorize("fileGSTReturn", args, user);
+      const r = await fileGstReturnExternal({
+        tenant_id: args.tenant_id,
+        finance_id: args.finance_id,
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "fileGSTReturn",
+        metadata: { finance_id: args.finance_id, reference: r.reference, driver: r.driver },
+      });
+      return r;
+    },
+
+    syncReraUpdates: async (_p, args, { user }) => {
+      authorize("syncReraUpdates", args, user);
+      const r = await syncReraUpdates({ tenant_id: args.tenant_id });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "syncReraUpdates",
+        metadata: { reference: r.reference, driver: r.driver },
+      });
+      return r;
+    },
+
+    requestAadhaarESign: async (_p, args, { user }) => {
+      authorize("requestAadhaarESign", args, user);
+      const r = await requestAadhaarEsign({
+        tenant_id: args.tenant_id,
+        contract_id: args.contract_id,
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "requestAadhaarESign",
+        metadata: { contract_id: args.contract_id, reference: r.reference, driver: r.driver },
+      });
+      return r;
+    },
+
+    importBimModel: async (_p, args, { user }) => {
+      authorize("importBimModel", args, user);
+      const r = await importBimModel({ tenant_id: args.tenant_id, url: args.url });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "importBimModel",
+        metadata: { url: args.url, reference: r.reference, driver: r.driver },
+      });
+      return r;
     },
   },
 };

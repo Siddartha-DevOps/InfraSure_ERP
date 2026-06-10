@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "InfraSure Field",
+    "slug": "infrasure-field",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1e293b"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Used to geo-tag Daily Progress Reports.",
+        "NSCameraUsageDescription": "Used to attach site photos to reports."
+      }
+    },
+    "android": {
+      "permissions": ["ACCESS_FINE_LOCATION", "CAMERA"]
+    },
+    "extra": {
+      "apiUrl": "http://localhost:4000/graphql"
+    }
+  }
+}
