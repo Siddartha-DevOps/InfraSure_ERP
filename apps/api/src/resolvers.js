@@ -22,10 +22,19 @@ function notFound(entity) {
 export const resolvers = {
   // Date fields are stored as DateTime but exposed as ISO strings.
   Contract: { expiry_date: (c) => iso(c.expiry_date) },
-  Finance: { due_date: (f) => iso(f.due_date) },
+  Finance: {
+    due_date: (f) => iso(f.due_date),
+    paid_date: (f) => iso(f.paid_date),
+  },
   Safety: { audit_date: (s) => iso(s.audit_date) },
   Dpr: { created_at: (d) => iso(d.created_at) },
   EnvironmentalReport: { created_at: (e) => iso(e.created_at) },
+  EnvironmentalLog: { recorded_at: (e) => iso(e.recorded_at) },
+  LabourFiling: { filed_date: (l) => iso(l.filed_date) },
+  ReraFiling: {
+    due_date: (r) => iso(r.due_date),
+    filed_date: (r) => iso(r.filed_date),
+  },
 
   Query: {
     me: async (_p, _a, { user }) => {
@@ -73,6 +82,97 @@ export const resolvers = {
     getSafetyAudits: async (_p, args, { user }) => {
       authorize("getSafetyAudits", args, user);
       return prisma.safety.findMany({ where: { tenant_id: args.tenant_id } });
+    },
+
+    getEnvironmentalLogs: async (_p, args, { user }) => {
+      authorize("getEnvironmentalLogs", args, user);
+      return prisma.environmentalLog.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { recorded_at: "desc" },
+      });
+    },
+
+    getLabourFilings: async (_p, args, { user }) => {
+      authorize("getLabourFilings", args, user);
+      return prisma.labourFiling.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { created_at: "desc" },
+      });
+    },
+
+    getReraFilings: async (_p, args, { user }) => {
+      authorize("getReraFilings", args, user);
+      return prisma.reraFiling.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { due_date: "asc" },
+      });
+    },
+
+    // Computes the Phase 2 compliance KPIs from live data for one tenant.
+    getComplianceKPIs: async (_p, args, { user }) => {
+      authorize("getComplianceKPIs", args, user);
+      const where = { tenant_id: args.tenant_id };
+      const [finances, safety, labour, rera] = await Promise.all([
+        prisma.finance.findMany({ where }),
+        prisma.safety.findMany({ where }),
+        prisma.labourFiling.findMany({ where }),
+        prisma.reraFiling.findMany({ where }),
+      ]);
+
+      // pct(matching, total) → percentage, 100 when there's nothing to track.
+      const pct = (n, total) => (total === 0 ? 100 : (n / total) * 100);
+      const round = (x) => Math.round(x * 10) / 10;
+
+      const gst = pct(
+        finances.filter((f) => f.gst_filing_status === "FILED").length,
+        finances.length
+      );
+      const tds = pct(
+        finances.filter((f) => f.tds_status === "FILED").length,
+        finances.length
+      );
+      const ra = pct(
+        finances.filter((f) => f.ra_bill_status === "APPROVED").length,
+        finances.length
+      );
+      const safetyDone = pct(
+        safety.filter((s) => s.checklist_status === "COMPLETED").length,
+        safety.length
+      );
+      const avgPpe =
+        safety.length === 0
+          ? 0
+          : safety.reduce((a, s) => a + (s.ppe_compliance || 0), 0) /
+            safety.length;
+      const pfEsi = pct(
+        labour.filter((l) => l.status === "FILED").length,
+        labour.length
+      );
+      const reraRate = pct(
+        rera.filter((r) => r.status === "FILED" || r.status === "APPROVED")
+          .length,
+        rera.length
+      );
+      const now = new Date();
+      const overdue = finances.filter(
+        (f) => !f.paid_date && new Date(f.due_date) < now
+      ).length;
+
+      // Audit-readiness score: simple average of the compliance percentages.
+      const readiness =
+        (gst + tds + ra + safetyDone + pfEsi + reraRate) / 6;
+
+      return {
+        gst_filing_compliance: round(gst),
+        tds_filing_compliance: round(tds),
+        ra_bill_approval_rate: round(ra),
+        safety_audit_completion: round(safetyDone),
+        avg_ppe_compliance: round(avgPpe),
+        pf_esi_filing_rate: round(pfEsi),
+        rera_filing_rate: round(reraRate),
+        overdue_payments: overdue,
+        audit_readiness_score: round(readiness),
+      };
     },
   },
 
@@ -168,6 +268,26 @@ export const resolvers = {
     },
 
     // ---- Finance ----
+    createFinanceRecord: async (_p, args, { user }) => {
+      authorize("createFinanceRecord", args, user);
+      const record = await prisma.finance.create({
+        data: {
+          tenant_id: args.tenant_id,
+          amount: args.amount,
+          due_date: new Date(args.due_date),
+          invoice_number: args.invoice_number ?? null,
+          filing_period: args.filing_period ?? null,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createFinanceRecord",
+        metadata: { finance_id: record.finance_id, amount: record.amount },
+      });
+      return record;
+    },
+
     fileGST: async (_p, args, { user }) => {
       authorize("fileGST", args, user);
       const record = await prisma.finance.findFirst({
@@ -182,6 +302,25 @@ export const resolvers = {
         tenant_id: args.tenant_id,
         user_id: user.user_id,
         action: "fileGST",
+        metadata: { finance_id: args.finance_id },
+      });
+      return updated;
+    },
+
+    fileTDS: async (_p, args, { user }) => {
+      authorize("fileTDS", args, user);
+      const record = await prisma.finance.findFirst({
+        where: { finance_id: args.finance_id, tenant_id: args.tenant_id },
+      });
+      if (!record) throw notFound("Finance record");
+      const updated = await prisma.finance.update({
+        where: { finance_id: args.finance_id },
+        data: { tds_status: "FILED" },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "fileTDS",
         metadata: { finance_id: args.finance_id },
       });
       return updated;
@@ -206,6 +345,25 @@ export const resolvers = {
       return updated;
     },
 
+    recordPayment: async (_p, args, { user }) => {
+      authorize("recordPayment", args, user);
+      const record = await prisma.finance.findFirst({
+        where: { finance_id: args.finance_id, tenant_id: args.tenant_id },
+      });
+      if (!record) throw notFound("Finance record");
+      const updated = await prisma.finance.update({
+        where: { finance_id: args.finance_id },
+        data: { paid_date: new Date() },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "recordPayment",
+        metadata: { finance_id: args.finance_id },
+      });
+      return updated;
+    },
+
     // ---- Safety / field ----
     logSafetyAudit: async (_p, args, { user }) => {
       authorize("logSafetyAudit", args, user);
@@ -213,6 +371,8 @@ export const resolvers = {
         data: {
           tenant_id: args.tenant_id,
           checklist_status: args.checklist_status,
+          site_name: args.site_name ?? null,
+          ppe_compliance: args.ppe_compliance ?? 0,
         },
       });
       await writeAuditLog({
@@ -251,6 +411,113 @@ export const resolvers = {
         metadata: { report_id: report.report_id },
       });
       return report;
+    },
+
+    logEnvironmentalLog: async (_p, args, { user }) => {
+      authorize("logEnvironmentalLog", args, user);
+      const log = await prisma.environmentalLog.create({
+        data: {
+          tenant_id: args.tenant_id,
+          log_type: args.log_type,
+          reading: args.reading,
+          unit: args.unit ?? "",
+          notes: args.notes ?? null,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "logEnvironmentalLog",
+        metadata: { env_log_id: log.env_log_id, log_type: log.log_type },
+      });
+      return log;
+    },
+
+    // ---- Labour & RERA ----
+    createLabourFiling: async (_p, args, { user }) => {
+      authorize("createLabourFiling", args, user);
+      const filing = await prisma.labourFiling.create({
+        data: {
+          tenant_id: args.tenant_id,
+          filing_type: args.filing_type,
+          period: args.period,
+          worker_count: args.worker_count ?? 0,
+          amount: args.amount ?? 0,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createLabourFiling",
+        metadata: { labour_id: filing.labour_id, filing_type: filing.filing_type },
+      });
+      return filing;
+    },
+
+    updateLabourFilingStatus: async (_p, args, { user }) => {
+      authorize("updateLabourFilingStatus", args, user);
+      const found = await prisma.labourFiling.findFirst({
+        where: { labour_id: args.labour_id, tenant_id: args.tenant_id },
+      });
+      if (!found) throw notFound("Labour filing");
+      const filing = await prisma.labourFiling.update({
+        where: { labour_id: args.labour_id },
+        data: {
+          status: args.status,
+          filed_date: args.status === "FILED" ? new Date() : found.filed_date,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "updateLabourFilingStatus",
+        metadata: { labour_id: args.labour_id, status: args.status },
+      });
+      return filing;
+    },
+
+    createReraFiling: async (_p, args, { user }) => {
+      authorize("createReraFiling", args, user);
+      const filing = await prisma.reraFiling.create({
+        data: {
+          tenant_id: args.tenant_id,
+          project_name: args.project_name,
+          due_date: new Date(args.due_date),
+          filing_type: args.filing_type ?? "QUARTERLY_UPDATE",
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createReraFiling",
+        metadata: { filing_id: filing.filing_id, project_name: filing.project_name },
+      });
+      return filing;
+    },
+
+    updateReraFilingStatus: async (_p, args, { user }) => {
+      authorize("updateReraFilingStatus", args, user);
+      const found = await prisma.reraFiling.findFirst({
+        where: { filing_id: args.filing_id, tenant_id: args.tenant_id },
+      });
+      if (!found) throw notFound("RERA filing");
+      const filing = await prisma.reraFiling.update({
+        where: { filing_id: args.filing_id },
+        data: {
+          status: args.status,
+          filed_date:
+            args.status === "FILED" || args.status === "APPROVED"
+              ? found.filed_date ?? new Date()
+              : found.filed_date,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "updateReraFilingStatus",
+        metadata: { filing_id: args.filing_id, status: args.status },
+      });
+      return filing;
     },
 
     // ---- Project management ----

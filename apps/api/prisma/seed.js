@@ -41,16 +41,111 @@ async function main() {
     },
   });
 
-  await prisma.finance.create({
-    data: {
-      tenant_id: tenant.tenant_id,
-      amount: 1500000,
-      due_date: new Date("2026-07-20"),
-    },
+  // --- Financial Compliance (mix of filed/pending + an overdue unpaid bill) ---
+  await prisma.finance.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        invoice_number: "INV-2026-001",
+        filing_period: "2026-Q1",
+        amount: 1500000,
+        due_date: new Date("2026-07-20"),
+        gst_filing_status: "FILED",
+        tds_status: "FILED",
+        ra_bill_status: "APPROVED",
+        paid_date: new Date("2026-06-01"),
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        invoice_number: "INV-2026-002",
+        filing_period: "2026-Q1",
+        amount: 820000,
+        due_date: new Date("2026-05-31"), // past due, unpaid → overdue KPI
+        gst_filing_status: "PENDING",
+        tds_status: "PENDING",
+        ra_bill_status: "PENDING",
+      },
+    ],
   });
 
-  await prisma.safety.create({
-    data: { tenant_id: tenant.tenant_id, checklist_status: "PENDING" },
+  // --- Safety & Environment ---
+  await prisma.safety.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        site_name: "Site A — Pier Casting",
+        checklist_status: "COMPLETED",
+        ppe_compliance: 92,
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        site_name: "Site B — Embankment",
+        checklist_status: "PENDING",
+        ppe_compliance: 70,
+      },
+    ],
+  });
+
+  await prisma.environmentalLog.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        log_type: "POLLUTION",
+        reading: 78,
+        unit: "AQI",
+        notes: "Dust suppression active",
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        log_type: "WASTE",
+        reading: 3.2,
+        unit: "tonnes",
+        notes: "Construction debris hauled to approved site",
+      },
+    ],
+  });
+
+  // --- Labour & RERA ---
+  await prisma.labourFiling.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        filing_type: "PF",
+        period: "2026-05",
+        worker_count: 120,
+        amount: 360000,
+        status: "FILED",
+        filed_date: new Date("2026-06-05"),
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        filing_type: "ESI",
+        period: "2026-05",
+        worker_count: 120,
+        amount: 90000,
+        status: "PENDING",
+      },
+    ],
+  });
+
+  await prisma.reraFiling.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        project_name: "Skyline Residency Tower A",
+        filing_type: "QUARTERLY_UPDATE",
+        status: "FILED",
+        due_date: new Date("2026-06-30"),
+        filed_date: new Date("2026-06-08"),
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        project_name: "Skyline Residency Tower B",
+        filing_type: "QUARTERLY_UPDATE",
+        status: "PENDING",
+        due_date: new Date("2026-07-31"),
+      },
+    ],
   });
 
   await prisma.workflowStep.create({

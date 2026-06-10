@@ -34,6 +34,9 @@ model Tenant {
   safetyAudits  Safety[]
   dprs          Dpr[]
   envReports    EnvironmentalReport[]
+  envLogs       EnvironmentalLog[]
+  labourFilings LabourFiling[]
+  reraFilings   ReraFiling[]
   workflowSteps WorkflowStep[]
 }
 
@@ -83,15 +86,18 @@ model Contract {
 }
 
 model Finance {
-  finance_id        String   @id @default(uuid())
+  finance_id        String    @id @default(uuid())
   tenant_id         String
-  gst_filing_status String   @default("PENDING")
-  tds_status        String   @default("PENDING")
-  ra_bill_status    String   @default("PENDING")
-  amount            Float    @default(0)
+  invoice_number    String?
+  filing_period     String? // e.g. "2026-Q1" or "2026-05"
+  gst_filing_status String    @default("PENDING") // PENDING | FILED
+  tds_status        String    @default("PENDING") // PENDING | FILED
+  ra_bill_status    String    @default("PENDING") // PENDING | APPROVED
+  amount            Float     @default(0)
   due_date          DateTime
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  paid_date         DateTime? // null = unpaid; drives payment-aging KPI
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 
@@ -101,10 +107,60 @@ model Finance {
 model Safety {
   safety_id           String   @id @default(uuid())
   tenant_id           String
+  site_name           String?
   audit_date          DateTime @default(now())
-  checklist_status    String   @default("PENDING")
+  checklist_status    String   @default("PENDING") // PENDING | COMPLETED | FAILED
+  ppe_compliance      Int      @default(0) // PPE checklist compliance %
   incident_report_url String?
   created_at          DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// Pollution / waste readings for environmental compliance.
+model EnvironmentalLog {
+  env_log_id  String   @id @default(uuid())
+  tenant_id   String
+  log_type    String // POLLUTION | WASTE
+  reading     Float    @default(0)
+  unit        String   @default("")
+  notes       String?
+  recorded_at DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// Labour-law filings: PF / ESI / wage registers.
+model LabourFiling {
+  labour_id    String    @id @default(uuid())
+  tenant_id    String
+  filing_type  String // PF | ESI | WAGE_REGISTER
+  period       String // e.g. "2026-05"
+  worker_count Int       @default(0)
+  amount       Float     @default(0)
+  status       String    @default("PENDING") // PENDING | FILED
+  filed_date   DateTime?
+  created_at   DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// RERA project filings & updates.
+model ReraFiling {
+  filing_id    String    @id @default(uuid())
+  tenant_id    String
+  project_name String
+  filing_type  String    @default("QUARTERLY_UPDATE")
+  status       String    @default("PENDING") // PENDING | FILED | APPROVED
+  due_date     DateTime
+  filed_date   DateTime?
+  created_at   DateTime  @default(now())
 
   tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 
