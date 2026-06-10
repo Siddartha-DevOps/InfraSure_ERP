@@ -88,17 +88,21 @@ S3 later, implement the `s3` branch in `apps/api/src/storage.js` — callers are
 
 ### Web app (Vercel)
 
-The repo ships a root [`vercel.json`](vercel.json) so Vercel builds the `apps/web`
-workspace and serves the SPA correctly from a monorepo:
+This is an npm-workspaces monorepo, so Vercel needs to know where the web app is.
+**Both** Root Directory configurations are covered out of the box:
 
-- `installCommand`: `npm install` (workspace-aware, run from repo root)
-- `buildCommand`: `npm run build --workspace apps/web`
-- `outputDirectory`: `apps/web/dist`
-- `rewrites`: all paths → `/index.html` (SPA fallback)
+- **Root Directory = repo root (default):** the root [`vercel.json`](vercel.json)
+  builds the workspace (`npm run build --workspace apps/web`), serves `apps/web/dist`,
+  and rewrites all paths → `/index.html`.
+- **Root Directory = `apps/web`:** Vercel auto-detects Vite and reads
+  [`apps/web/vercel.json`](apps/web/vercel.json) for the SPA `/index.html` rewrite.
 
 Without this, Vercel builds from the repo root (which has no `index.html`) and every
-URL returns Vercel's `404: NOT_FOUND` page. If you prefer the dashboard route instead,
-set **Settings → General → Root Directory** to `apps/web` and remove `vercel.json`.
+URL returns Vercel's `404: NOT_FOUND` page.
+
+> **You must redeploy.** Config changes only take effect on the **next** deployment —
+> trigger a fresh deploy (or push) after pulling these files; an existing/cached
+> deployment will keep 404-ing until then.
 
 > **Set `VITE_API_URL`.** The web app reads the GraphQL endpoint from `VITE_API_URL`
 > (`apps/web/src/api.js`), defaulting to `http://localhost:4000/graphql`. In your Vercel
