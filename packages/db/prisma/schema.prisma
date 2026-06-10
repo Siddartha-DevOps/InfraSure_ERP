@@ -37,6 +37,8 @@ model Tenant {
   envLogs       EnvironmentalLog[]
   labourFilings LabourFiling[]
   reraFilings   ReraFiling[]
+  vendors       Vendor[]
+  disputes      Dispute[]
   workflowSteps WorkflowStep[]
 }
 
@@ -56,13 +58,50 @@ model User {
 }
 
 model Subscription {
-  subscription_id    String   @id @default(uuid())
-  tenant_id          String
-  plan_type          String   @default("BASIC")
-  billing_cycle      String   @default("MONTHLY")
-  stripe_customer_id String?
-  status             String   @default("ACTIVE")
-  created_at         DateTime @default(now())
+  subscription_id        String    @id @default(uuid())
+  tenant_id              String
+  plan_type              String    @default("BASIC") // BASIC | PRO | ENTERPRISE
+  billing_cycle          String    @default("MONTHLY")
+  stripe_customer_id     String?
+  stripe_subscription_id String?
+  current_period_end     DateTime?
+  status                 String    @default("ACTIVE")
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// Vendor / subcontractor registry with certification-expiry tracking.
+model Vendor {
+  vendor_id            String    @id @default(uuid())
+  tenant_id            String
+  name                 String
+  gst_number           String?
+  certification_name   String?
+  certification_expiry DateTime?
+  status               String    @default("ACTIVE") // ACTIVE | SUSPENDED
+  created_at           DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// Risk / dispute register with escalation workflow.
+model Dispute {
+  dispute_id       String    @id @default(uuid())
+  tenant_id        String
+  title            String
+  dispute_type     String    @default("CONTRACT") // CONTRACT | PAYMENT | SAFETY | OTHER
+  counterparty     String?
+  amount           Float     @default(0)
+  status           String    @default("OPEN") // OPEN | IN_ARBITRATION | ESCALATED | RESOLVED
+  escalation_level Int       @default(0)
+  opened_at        DateTime  @default(now())
+  resolved_at      DateTime?
 
   tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 

@@ -10,6 +10,7 @@ import {
   verifyPassword,
   signToken,
 } from "./auth.js";
+import { listTiers, createCheckoutSession, isValidPlan } from "./billing.js";
 
 const iso = (d) => (d instanceof Date ? d.toISOString() : d);
 
@@ -35,6 +36,12 @@ export const resolvers = {
     due_date: (r) => iso(r.due_date),
     filed_date: (r) => iso(r.filed_date),
   },
+  Vendor: { certification_expiry: (v) => iso(v.certification_expiry) },
+  Dispute: {
+    opened_at: (d) => iso(d.opened_at),
+    resolved_at: (d) => iso(d.resolved_at),
+  },
+  Subscription: { current_period_end: (s) => iso(s.current_period_end) },
 
   Query: {
     me: async (_p, _a, { user }) => {
@@ -172,6 +179,110 @@ export const resolvers = {
         rera_filing_rate: round(reraRate),
         overdue_payments: overdue,
         audit_readiness_score: round(readiness),
+      };
+    },
+
+    // ---- Phase 3: Vendors / Disputes / Billing / Audit readiness ----
+    getVendors: async (_p, args, { user }) => {
+      authorize("getVendors", args, user);
+      return prisma.vendor.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { created_at: "desc" },
+      });
+    },
+
+    getExpiringCertifications: async (_p, args, { user }) => {
+      authorize("getExpiringCertifications", args, user);
+      const withinDays = args.withinDays ?? 30;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + withinDays);
+      return prisma.vendor.findMany({
+        where: {
+          tenant_id: args.tenant_id,
+          certification_expiry: { not: null, lte: cutoff },
+        },
+        orderBy: { certification_expiry: "asc" },
+      });
+    },
+
+    getDisputes: async (_p, args, { user }) => {
+      authorize("getDisputes", args, user);
+      return prisma.dispute.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { opened_at: "desc" },
+      });
+    },
+
+    getSubscription: async (_p, args, { user }) => {
+      authorize("getSubscription", args, user);
+      return prisma.subscription.findFirst({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { created_at: "desc" },
+      });
+    },
+
+    getBillingTiers: async (_p, _args, { user }) => {
+      // Any authenticated user may view plans; no tenant arg to scope.
+      authorize("getBillingTiers", {}, user);
+      return listTiers();
+    },
+
+    // Rolls up document/approval/dispute/vendor signals into a readiness score.
+    getAuditReadiness: async (_p, args, { user }) => {
+      authorize("getAuditReadiness", args, user);
+      const where = { tenant_id: args.tenant_id };
+      const [contracts, steps, finances, labour, rera, vendors, disputes] =
+        await Promise.all([
+          prisma.contract.findMany({ where }),
+          prisma.workflowStep.findMany({ where }),
+          prisma.finance.findMany({ where }),
+          prisma.labourFiling.findMany({ where }),
+          prisma.reraFiling.findMany({ where }),
+          prisma.vendor.findMany({ where }),
+          prisma.dispute.findMany({ where }),
+        ]);
+
+      const round = (x) => Math.round(x * 10) / 10;
+      const documents_total = contracts.length;
+      const documents_verified = contracts.filter((c) => c.document_url).length;
+
+      const pending_approvals =
+        steps.filter((s) => s.status === "PENDING").length +
+        finances.filter((f) => f.ra_bill_status !== "APPROVED").length +
+        labour.filter((l) => l.status !== "FILED").length +
+        rera.filter((r) => r.status === "PENDING").length;
+
+      const open_disputes = disputes.filter(
+        (d) => d.status !== "RESOLVED"
+      ).length;
+
+      const now = new Date();
+      const vendorValid = vendors.filter(
+        (v) =>
+          v.status === "ACTIVE" &&
+          (!v.certification_expiry || new Date(v.certification_expiry) >= now)
+      ).length;
+      const vendor_compliance_rate =
+        vendors.length === 0 ? 100 : (vendorValid / vendors.length) * 100;
+
+      // Readiness: documents verified, vendor compliance, and penalties for
+      // pending approvals and open disputes (each capped so score stays 0–100).
+      const docScore =
+        documents_total === 0 ? 100 : (documents_verified / documents_total) * 100;
+      const approvalPenalty = Math.min(pending_approvals * 5, 40);
+      const disputePenalty = Math.min(open_disputes * 5, 30);
+      const score = Math.max(
+        0,
+        (docScore + vendor_compliance_rate) / 2 - approvalPenalty - disputePenalty
+      );
+
+      return {
+        documents_verified,
+        documents_total,
+        pending_approvals,
+        open_disputes,
+        vendor_compliance_rate: round(vendor_compliance_rate),
+        audit_readiness_score: round(score),
       };
     },
   },
@@ -557,6 +668,171 @@ export const resolvers = {
         metadata: { target_user_id: args.user_id, role: args.role },
       });
       return updated;
+    },
+
+    // ---- Phase 3: Vendors ----
+    createVendor: async (_p, args, { user }) => {
+      authorize("createVendor", args, user);
+      const vendor = await prisma.vendor.create({
+        data: {
+          tenant_id: args.tenant_id,
+          name: args.name,
+          gst_number: args.gst_number ?? null,
+          certification_name: args.certification_name ?? null,
+          certification_expiry: args.certification_expiry
+            ? new Date(args.certification_expiry)
+            : null,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createVendor",
+        metadata: { vendor_id: vendor.vendor_id, name: vendor.name },
+      });
+      return vendor;
+    },
+
+    updateVendorStatus: async (_p, args, { user }) => {
+      authorize("updateVendorStatus", args, user);
+      const found = await prisma.vendor.findFirst({
+        where: { vendor_id: args.vendor_id, tenant_id: args.tenant_id },
+      });
+      if (!found) throw notFound("Vendor");
+      const vendor = await prisma.vendor.update({
+        where: { vendor_id: args.vendor_id },
+        data: { status: args.status },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "updateVendorStatus",
+        metadata: { vendor_id: args.vendor_id, status: args.status },
+      });
+      return vendor;
+    },
+
+    // ---- Phase 3: Disputes ----
+    createDispute: async (_p, args, { user }) => {
+      authorize("createDispute", args, user);
+      const dispute = await prisma.dispute.create({
+        data: {
+          tenant_id: args.tenant_id,
+          title: args.title,
+          dispute_type: args.dispute_type ?? "CONTRACT",
+          counterparty: args.counterparty ?? null,
+          amount: args.amount ?? 0,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createDispute",
+        metadata: { dispute_id: dispute.dispute_id, title: dispute.title },
+      });
+      return dispute;
+    },
+
+    updateDisputeStatus: async (_p, args, { user }) => {
+      authorize("updateDisputeStatus", args, user);
+      const found = await prisma.dispute.findFirst({
+        where: { dispute_id: args.dispute_id, tenant_id: args.tenant_id },
+      });
+      if (!found) throw notFound("Dispute");
+      const dispute = await prisma.dispute.update({
+        where: { dispute_id: args.dispute_id },
+        data: {
+          status: args.status,
+          resolved_at:
+            args.status === "RESOLVED" ? new Date() : found.resolved_at,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "updateDisputeStatus",
+        metadata: { dispute_id: args.dispute_id, status: args.status },
+      });
+      return dispute;
+    },
+
+    escalateDispute: async (_p, args, { user }) => {
+      authorize("escalateDispute", args, user);
+      const found = await prisma.dispute.findFirst({
+        where: { dispute_id: args.dispute_id, tenant_id: args.tenant_id },
+      });
+      if (!found) throw notFound("Dispute");
+      const dispute = await prisma.dispute.update({
+        where: { dispute_id: args.dispute_id },
+        data: {
+          status: "ESCALATED",
+          escalation_level: { increment: 1 },
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "escalateDispute",
+        metadata: {
+          dispute_id: args.dispute_id,
+          escalation_level: dispute.escalation_level,
+        },
+      });
+      return dispute;
+    },
+
+    // ---- Phase 3: Billing ----
+    changeSubscriptionPlan: async (_p, args, { user }) => {
+      authorize("changeSubscriptionPlan", args, user);
+      if (!isValidPlan(args.plan_type)) {
+        throw new GraphQLError(`Unknown plan: ${args.plan_type}`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      }
+      const sub = await prisma.subscription.findFirst({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { created_at: "desc" },
+      });
+      if (!sub) throw notFound("Subscription");
+      const updated = await prisma.subscription.update({
+        where: { subscription_id: sub.subscription_id },
+        data: { plan_type: args.plan_type },
+      });
+      // Keep the tenant's denormalized plan label in sync.
+      await prisma.tenant.update({
+        where: { tenant_id: args.tenant_id },
+        data: { subscription_plan: args.plan_type },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "changeSubscriptionPlan",
+        metadata: { plan_type: args.plan_type },
+      });
+      return updated;
+    },
+
+    createBillingCheckout: async (_p, args, { user }) => {
+      authorize("createBillingCheckout", args, user);
+      if (!isValidPlan(args.plan_type)) {
+        throw new GraphQLError(`Unknown plan: ${args.plan_type}`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      }
+      const dbUser = await prisma.user.findUnique({
+        where: { user_id: user.user_id },
+      });
+      const session = await createCheckoutSession({
+        plan_type: args.plan_type,
+        customer_email: dbUser?.email,
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createBillingCheckout",
+        metadata: { plan_type: args.plan_type, driver: session.driver },
+      });
+      return session;
     },
   },
 };

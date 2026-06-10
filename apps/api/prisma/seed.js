@@ -148,6 +148,53 @@ async function main() {
     ],
   });
 
+  // --- Vendors (one with a soon-to-expire certification) ---
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 20);
+  await prisma.vendor.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        name: "Apex Scaffolding Co.",
+        gst_number: "29APEXS1234G1Z2",
+        certification_name: "ISO 45001 Safety",
+        certification_expiry: soon, // within 30 days → expiring-cert alert
+        status: "ACTIVE",
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        name: "Ready-Mix Concrete Ltd",
+        gst_number: "29RMCON5678H1Z9",
+        certification_name: "BIS Concrete Grade",
+        certification_expiry: new Date("2027-01-31"),
+        status: "ACTIVE",
+      },
+    ],
+  });
+
+  // --- Disputes ---
+  await prisma.dispute.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        title: "Delay penalty claim — Highway Phase II",
+        dispute_type: "CONTRACT",
+        counterparty: "State Highways Authority",
+        amount: 2500000,
+        status: "IN_ARBITRATION",
+        escalation_level: 1,
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        title: "Subcontractor payment dispute",
+        dispute_type: "PAYMENT",
+        counterparty: "Apex Scaffolding Co.",
+        amount: 450000,
+        status: "OPEN",
+      },
+    ],
+  });
+
   await prisma.workflowStep.create({
     data: { tenant_id: tenant.tenant_id, name: "Approve RA Bill #1" },
   });
