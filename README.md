@@ -83,3 +83,33 @@ curl -X POST http://localhost:4000/api/contracts/<CONTRACT_ID>/document \
 Storage is configured via `STORAGE_DRIVER` (default `local`) and `UPLOAD_DIR`
 (default `uploads/`). In dev, stored files are served from `/files/*`. To move to
 S3 later, implement the `s3` branch in `apps/api/src/storage.js` — callers are unchanged.
+
+## Deploying
+
+### Web app (Vercel)
+
+The repo ships a root [`vercel.json`](vercel.json) so Vercel builds the `apps/web`
+workspace and serves the SPA correctly from a monorepo:
+
+- `installCommand`: `npm install` (workspace-aware, run from repo root)
+- `buildCommand`: `npm run build --workspace apps/web`
+- `outputDirectory`: `apps/web/dist`
+- `rewrites`: all paths → `/index.html` (SPA fallback)
+
+Without this, Vercel builds from the repo root (which has no `index.html`) and every
+URL returns Vercel's `404: NOT_FOUND` page. If you prefer the dashboard route instead,
+set **Settings → General → Root Directory** to `apps/web` and remove `vercel.json`.
+
+> **Set `VITE_API_URL`.** The web app reads the GraphQL endpoint from `VITE_API_URL`
+> (`apps/web/src/api.js`), defaulting to `http://localhost:4000/graphql`. In your Vercel
+> project's **Environment Variables**, set `VITE_API_URL` to your deployed API's public
+> `/graphql` URL — otherwise the deployed frontend will try to reach `localhost` and
+> login/queries will fail.
+
+### API (separate host)
+
+Vercel is static/serverless; the Express + Apollo API and its datastores (PostgreSQL,
+MongoDB, Redis) do **not** run there as-is. Host the API on a container/VM platform
+(Render, Railway, Fly.io, ECS, a VM, …) with those datastores provisioned, set the API's
+env vars (`DATABASE_URL`, `MONGO_URL`, `JWT_SECRET`, …), then point the web app's
+`VITE_API_URL` at it.
