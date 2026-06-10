@@ -97,6 +97,62 @@ export const typeDefs = /* GraphQL */ `
     filed_date: String
   }
 
+  type Vendor {
+    vendor_id: ID!
+    tenant_id: ID!
+    name: String!
+    gst_number: String
+    certification_name: String
+    certification_expiry: String
+    status: String!
+  }
+
+  type Dispute {
+    dispute_id: ID!
+    tenant_id: ID!
+    title: String!
+    dispute_type: String!
+    counterparty: String
+    amount: Float!
+    status: String!
+    escalation_level: Int!
+    opened_at: String!
+    resolved_at: String
+  }
+
+  type Subscription {
+    subscription_id: ID!
+    tenant_id: ID!
+    plan_type: String!
+    billing_cycle: String!
+    status: String!
+    current_period_end: String
+  }
+
+  type BillingTier {
+    code: String!
+    name: String!
+    price_inr: Int!
+    features: [String!]!
+  }
+
+  type CheckoutSession {
+    session_id: String!
+    url: String!
+    plan_type: String!
+    driver: String!
+  }
+
+  # Phase 3 audit-readiness rollup.
+  type AuditReadiness {
+    documents_verified: Int!
+    documents_total: Int!
+    pending_approvals: Int!
+    open_disputes: Int!
+    vendor_compliance_rate: Float!
+    audit_readiness_score: Float!
+  }
+
   # Computed compliance KPIs for the Phase 2 dashboard.
   type ComplianceKPIs {
     gst_filing_compliance: Float!
@@ -145,6 +201,14 @@ export const typeDefs = /* GraphQL */ `
     getReraFilings(tenant_id: ID!): [ReraFiling!]!
     # Aggregated compliance KPIs across all Phase 2 modules.
     getComplianceKPIs(tenant_id: ID!): ComplianceKPIs!
+
+    # --- Phase 3 ---
+    getVendors(tenant_id: ID!): [Vendor!]!
+    getExpiringCertifications(tenant_id: ID!, withinDays: Int = 30): [Vendor!]!
+    getDisputes(tenant_id: ID!): [Dispute!]!
+    getSubscription(tenant_id: ID!): Subscription
+    getBillingTiers: [BillingTier!]!
+    getAuditReadiness(tenant_id: ID!): AuditReadiness!
   }
 
   type Mutation {
@@ -214,5 +278,30 @@ export const typeDefs = /* GraphQL */ `
     # --- Project management ---
     approveWorkflowStep(tenant_id: ID!, step_id: ID!): WorkflowStep!
     assignUserRole(tenant_id: ID!, user_id: ID!, role: Role!): User!
+
+    # --- Phase 3: Vendors ---
+    createVendor(
+      tenant_id: ID!
+      name: String!
+      gst_number: String
+      certification_name: String
+      certification_expiry: String
+    ): Vendor!
+    updateVendorStatus(tenant_id: ID!, vendor_id: ID!, status: String!): Vendor!
+
+    # --- Phase 3: Disputes ---
+    createDispute(
+      tenant_id: ID!
+      title: String!
+      dispute_type: String
+      counterparty: String
+      amount: Float
+    ): Dispute!
+    updateDisputeStatus(tenant_id: ID!, dispute_id: ID!, status: String!): Dispute!
+    escalateDispute(tenant_id: ID!, dispute_id: ID!): Dispute!
+
+    # --- Phase 3: Billing ---
+    changeSubscriptionPlan(tenant_id: ID!, plan_type: String!): Subscription!
+    createBillingCheckout(tenant_id: ID!, plan_type: String!): CheckoutSession!
   }
 `;

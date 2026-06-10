@@ -91,6 +91,29 @@ Built on the Phase 1 foundation; same architecture, no rework.
 - **Seed:** sample finance / safety / environment / labour / RERA records (incl. an overdue
   bill) so KPIs render immediately.
 
+## 6c. Phase 3 — concrete deliverable (Trust & money)
+
+Built on Phases 1–2; same architecture, no rework.
+
+- **Vendor / subcontractor compliance:** `Vendor` registry with certification-expiry
+  tracking. Query `getVendors`, `getExpiringCertifications(withinDays=30)`; mutations
+  `createVendor`, `updateVendorStatus` (active/suspended).
+- **Risk & dispute tracking:** `Dispute` register with type, amount, counterparty and an
+  **escalation workflow**. Query `getDisputes`; mutations `createDispute`,
+  `updateDisputeStatus`, `escalateDispute` (increments escalation level).
+- **Audit Readiness dashboard:** `getAuditReadiness` rolls up documents verified vs total,
+  pending approvals (workflow + RA bills + labour + RERA), open disputes, vendor-compliance
+  rate, and a composite **audit-readiness score** (penalised for pending approvals/disputes).
+- **Stripe billing & subscription tiers:** BASIC / PRO / ENTERPRISE tiers via a billing
+  adapter (`apps/api/src/billing.js`) — **stub driver by default**, real **Stripe Checkout**
+  when `STRIPE_SECRET_KEY` is set. Query `getSubscription`, `getBillingTiers`; mutations
+  `changeSubscriptionPlan`, `createBillingCheckout`. Billing is ADMIN-only.
+- **Web:** new Audit / Vendors / Disputes / Billing tabs (role-aware), a richer Portfolio
+  audit-readiness tile, and a pricing/upgrade UI.
+- **RBAC + audit:** every new query/mutation is role-gated and every mutation is
+  audit-logged to MongoDB.
+- **Seed:** sample vendors (incl. an expiring certification) and disputes.
+
 ## 7. Decisions (Phase 1)
 
 - **API:** GraphQL for data/dashboard queries; REST only for file uploads.

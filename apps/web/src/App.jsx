@@ -12,23 +12,39 @@ const NAV_BY_ROLE = {
   ADMIN: [
     "portfolio",
     "compliance",
+    "audit",
     "contracts",
     "finance",
     "safety",
     "environment",
     "labour",
     "rera",
+    "vendors",
+    "disputes",
+    "billing",
   ],
-  PROJECT_MANAGER: ["portfolio", "compliance", "contracts", "finance", "rera"],
+  PROJECT_MANAGER: [
+    "portfolio",
+    "compliance",
+    "audit",
+    "contracts",
+    "finance",
+    "rera",
+    "vendors",
+    "disputes",
+  ],
   COMPLIANCE_OFFICER: [
     "compliance",
+    "audit",
     "contracts",
     "safety",
     "environment",
     "labour",
     "rera",
+    "vendors",
+    "disputes",
   ],
-  ACCOUNTANT: ["compliance", "finance", "labour"],
+  ACCOUNTANT: ["compliance", "audit", "finance", "labour"],
   ENGINEER: ["safety", "environment", "contracts"],
 };
 
@@ -146,6 +162,11 @@ function Dashboard({ session, onLogout }) {
     environment: [],
     labour: [],
     rera: [],
+    vendors: [],
+    disputes: [],
+    tiers: [],
+    subscription: null,
+    audit: null,
     kpis: null,
   });
   const [err, setErr] = useState("");
@@ -163,6 +184,11 @@ function Dashboard({ session, onLogout }) {
         environment: [],
         labour: [],
         rera: [],
+        vendors: [],
+        disputes: [],
+        tiers: [],
+        subscription: null,
+        audit: null,
         kpis: null,
       };
       const safe = (p, fb) => p.then((d) => d).catch(() => fb);
@@ -246,6 +272,51 @@ function Dashboard({ session, onLogout }) {
           );
           out.rera = d.getReraFilings || [];
         }
+        if (tabs.includes("vendors")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getVendors(tenant_id:$t){vendor_id name gst_number certification_name certification_expiry status}}`,
+              { t }
+            ),
+            { getVendors: [] }
+          );
+          out.vendors = d.getVendors || [];
+        }
+        if (tabs.includes("disputes")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getDisputes(tenant_id:$t){dispute_id title dispute_type counterparty amount status escalation_level}}`,
+              { t }
+            ),
+            { getDisputes: [] }
+          );
+          out.disputes = d.getDisputes || [];
+        }
+        if (tabs.includes("audit") || tabs.includes("portfolio")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getAuditReadiness(tenant_id:$t){documents_verified documents_total pending_approvals open_disputes vendor_compliance_rate audit_readiness_score}}`,
+              { t }
+            ),
+            { getAuditReadiness: null }
+          );
+          out.audit = d.getAuditReadiness;
+        }
+        if (tabs.includes("billing")) {
+          const sub = await safe(
+            gql(
+              `query($t:ID!){getSubscription(tenant_id:$t){plan_type billing_cycle status current_period_end}}`,
+              { t }
+            ),
+            { getSubscription: null }
+          );
+          out.subscription = sub.getSubscription;
+          const tiers = await safe(
+            gql(`query{getBillingTiers{code name price_inr features}}`),
+            { getBillingTiers: [] }
+          );
+          out.tiers = tiers.getBillingTiers || [];
+        }
         setData(out);
       } catch (e) {
         setErr(e.message);
@@ -276,6 +347,22 @@ function Dashboard({ session, onLogout }) {
     try {
       await gql(query, { ...variables, t: user.tenant_id });
       refresh();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  const [checkout, setCheckout] = useState(null);
+
+  async function startCheckout(plan) {
+    setErr("");
+    setCheckout(null);
+    try {
+      const d = await gql(
+        `mutation($t:ID!,$p:String!){createBillingCheckout(tenant_id:$t,plan_type:$p){url driver plan_type}}`,
+        { t: user.tenant_id, p: plan }
+      );
+      setCheckout(d.createBillingCheckout);
     } catch (e) {
       setErr(e.message);
     }
@@ -326,10 +413,16 @@ function Dashboard({ session, onLogout }) {
             </Card>
             <Card title="Audit Readiness">
               <p className="text-4xl font-bold text-emerald-600">
-                {data.kpis ? `${data.kpis.audit_readiness_score}%` : "—"}
+                {data.audit
+                  ? `${data.audit.audit_readiness_score}%`
+                  : data.kpis
+                  ? `${data.kpis.audit_readiness_score}%`
+                  : "—"}
               </p>
               <p className="text-xs text-slate-500 mt-1">
-                Composite of all compliance KPIs
+                {data.audit
+                  ? `${data.audit.open_disputes} open disputes · ${data.audit.pending_approvals} pending approvals`
+                  : "Composite of all compliance KPIs"}
               </p>
             </Card>
             <Card title="Expiry Alerts (next 30 days)">
@@ -636,6 +729,229 @@ function Dashboard({ session, onLogout }) {
                 })}
               </tbody>
             </table>
+          </Card>
+        )}
+
+        {tab === "audit" && (
+          <Card title="Audit Readiness" wide>
+            {!data.audit ? (
+              <p className="text-sm text-slate-500">No audit data.</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <Kpi
+                  label="Audit readiness"
+                  value={data.audit.audit_readiness_score}
+                />
+                <Kpi
+                  label="Vendor compliance"
+                  value={data.audit.vendor_compliance_rate}
+                />
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <p className="text-xs text-slate-500">Documents verified</p>
+                  <p className="text-2xl font-bold text-slate-800">
+                    {data.audit.documents_verified}/{data.audit.documents_total}
+                  </p>
+                </div>
+                <Kpi
+                  label="Pending approvals"
+                  value={data.audit.pending_approvals}
+                  suffix=""
+                />
+                <Kpi
+                  label="Open disputes"
+                  value={data.audit.open_disputes}
+                  suffix=""
+                />
+              </div>
+            )}
+          </Card>
+        )}
+
+        {tab === "vendors" && (
+          <Card title="Vendor / Subcontractor Registry" wide>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-400">
+                  <th className="py-1">Vendor</th>
+                  <th>Certification</th>
+                  <th>Cert. expiry</th>
+                  <th>Status</th>
+                  {canUpload && <th></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {data.vendors.map((v) => {
+                  const d = daysUntil(v.certification_expiry);
+                  const soon = v.certification_expiry && d <= 30;
+                  return (
+                    <tr key={v.vendor_id} className="border-t">
+                      <td className="py-2">{v.name}</td>
+                      <td>{v.certification_name || "—"}</td>
+                      <td className={soon ? "text-amber-600 font-medium" : ""}>
+                        {v.certification_expiry
+                          ? `${v.certification_expiry.slice(0, 10)}${
+                              soon ? (d < 0 ? " (expired)" : ` (${d}d)`) : ""
+                            }`
+                          : "—"}
+                      </td>
+                      <td><StatusPill value={v.status} /></td>
+                      {canUpload && (
+                        <td>
+                          <button
+                            onClick={() =>
+                              mutate(
+                                `mutation($t:ID!,$id:ID!,$s:String!){updateVendorStatus(tenant_id:$t,vendor_id:$id,status:$s){vendor_id}}`,
+                                {
+                                  id: v.vendor_id,
+                                  s: v.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
+                                }
+                              )
+                            }
+                            className="text-blue-600 underline text-xs"
+                          >
+                            {v.status === "ACTIVE" ? "suspend" : "reactivate"}
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {tab === "disputes" && (
+          <Card title="Risk & Dispute Register" wide>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-400">
+                  <th className="py-1">Title</th>
+                  <th>Type</th>
+                  <th>Counterparty</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Esc.</th>
+                  {canUpload && <th></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {data.disputes.map((d) => (
+                  <tr key={d.dispute_id} className="border-t">
+                    <td className="py-2">{d.title}</td>
+                    <td>{d.dispute_type}</td>
+                    <td>{d.counterparty || "—"}</td>
+                    <td>₹{d.amount.toLocaleString("en-IN")}</td>
+                    <td><StatusPill value={d.status} /></td>
+                    <td>{d.escalation_level}</td>
+                    {canUpload && (
+                      <td className="space-x-2">
+                        {d.status !== "RESOLVED" && (
+                          <>
+                            <button
+                              onClick={() =>
+                                mutate(
+                                  `mutation($t:ID!,$id:ID!){escalateDispute(tenant_id:$t,dispute_id:$id){dispute_id}}`,
+                                  { id: d.dispute_id }
+                                )
+                              }
+                              className="text-amber-600 underline text-xs"
+                            >
+                              escalate
+                            </button>
+                            <button
+                              onClick={() =>
+                                mutate(
+                                  `mutation($t:ID!,$id:ID!){updateDisputeStatus(tenant_id:$t,dispute_id:$id,status:"RESOLVED"){dispute_id}}`,
+                                  { id: d.dispute_id }
+                                )
+                              }
+                              className="text-emerald-600 underline text-xs"
+                            >
+                              resolve
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {tab === "billing" && (
+          <Card title="Billing & Subscription" wide>
+            <p className="text-sm text-slate-600 mb-4">
+              Current plan:{" "}
+              <span className="font-semibold text-slate-800">
+                {data.subscription?.plan_type || "—"}
+              </span>{" "}
+              · status {data.subscription?.status || "—"}
+            </p>
+            {checkout && (
+              <p className="text-sm mb-4 bg-emerald-50 text-emerald-700 rounded p-3">
+                Checkout session created ({checkout.driver}):{" "}
+                <a
+                  href={checkout.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline break-all"
+                >
+                  {checkout.url}
+                </a>
+              </p>
+            )}
+            <div className="grid md:grid-cols-3 gap-4">
+              {data.tiers.map((tier) => {
+                const current = data.subscription?.plan_type === tier.code;
+                return (
+                  <div
+                    key={tier.code}
+                    className={`rounded-lg border p-4 ${
+                      current ? "border-slate-800" : "border-slate-200"
+                    }`}
+                  >
+                    <h4 className="font-semibold text-slate-800">{tier.name}</h4>
+                    <p className="text-2xl font-bold text-slate-800 my-1">
+                      ₹{tier.price_inr.toLocaleString("en-IN")}
+                      <span className="text-xs font-normal text-slate-500">/mo</span>
+                    </p>
+                    <ul className="text-xs text-slate-500 space-y-1 mb-3">
+                      {tier.features.map((f) => (
+                        <li key={f}>• {f}</li>
+                      ))}
+                    </ul>
+                    {current ? (
+                      <span className="text-xs text-emerald-600 font-medium">
+                        Current plan
+                      </span>
+                    ) : (
+                      <div className="space-x-3">
+                        <button
+                          onClick={() =>
+                            mutate(
+                              `mutation($t:ID!,$p:String!){changeSubscriptionPlan(tenant_id:$t,plan_type:$p){plan_type}}`,
+                              { p: tier.code }
+                            )
+                          }
+                          className="text-blue-600 underline text-xs"
+                        >
+                          switch
+                        </button>
+                        <button
+                          onClick={() => startCheckout(tier.code)}
+                          className="text-slate-600 underline text-xs"
+                        >
+                          checkout
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </Card>
         )}
       </main>

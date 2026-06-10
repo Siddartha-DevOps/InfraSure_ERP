@@ -28,5 +28,8 @@
   },
   "devDependencies": {
     "prisma": "^5.20.0"
+  },
+  "optionalDependencies": {
+    "stripe": "^16.2.0"
   }
 }

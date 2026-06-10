@@ -68,6 +68,19 @@ Default demo credentials are printed by the seed script.
 
 All new operations are RBAC-gated per role and every mutation is audit-logged to MongoDB.
 
+## Phase 3 scope (Trust & money)
+
+- **Vendor compliance:** vendor/subcontractor registry with certification-expiry alerts
+  (`getVendors`, `getExpiringCertifications`, `createVendor`, `updateVendorStatus`).
+- **Risk & dispute tracking:** dispute register with escalation workflow
+  (`getDisputes`, `createDispute`, `updateDisputeStatus`, `escalateDispute`).
+- **Audit Readiness dashboard:** `getAuditReadiness` — documents verified, pending
+  approvals, open disputes, vendor-compliance rate, and a composite readiness score.
+- **Stripe billing & tiers:** BASIC/PRO/ENTERPRISE via a billing adapter
+  (`getBillingTiers`, `getSubscription`, `changeSubscriptionPlan`, `createBillingCheckout`).
+  Defaults to a **stub** driver; set `BILLING_DRIVER=stripe` + `STRIPE_SECRET_KEY` for real
+  Stripe Checkout. Billing is ADMIN-only.
+
 ## Contract document upload (REST)
 
 File uploads stay on REST (per the Phase 1 decision); everything else is GraphQL.
