@@ -87,6 +87,8 @@ export const typeDefs = /* GraphQL */ `
     getTenant(tenant_id: ID!): Tenant
     getUsers(tenant_id: ID!): [User!]!
     getContracts(tenant_id: ID!): [Contract!]!
+    # Contracts expiring within the given window (default 30 days) — expiry alerts.
+    getExpiringContracts(tenant_id: ID!, withinDays: Int = 30): [Contract!]!
     getFinanceRecords(tenant_id: ID!): [Finance!]!
     getSafetyAudits(tenant_id: ID!): [Safety!]!
   }

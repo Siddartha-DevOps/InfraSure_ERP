@@ -23,7 +23,8 @@
     "express": "^4.21.0",
     "graphql": "^16.9.0",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.9.0"
+    "mongodb": "^6.9.0",
+    "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
     "prisma": "^5.20.0"

@@ -7,19 +7,29 @@ import { GraphQLError } from "graphql";
 export const PUBLIC_OPERATIONS = new Set(["signupTenant", "login", "me"]);
 
 export const PERMISSIONS = {
-  ENGINEER: ["getSafetyAudits", "getContracts", "logSafetyAudit", "createDPR"],
+  ENGINEER: [
+    "getSafetyAudits",
+    "getContracts",
+    "getExpiringContracts",
+    "logSafetyAudit",
+    "createDPR",
+  ],
   ACCOUNTANT: ["getFinanceRecords", "fileGST", "approveRABill"],
   COMPLIANCE_OFFICER: [
     "getContracts",
+    "getExpiringContracts",
     "getSafetyAudits",
     "updateContractStatus",
+    "uploadContractDocument",
     "logEnvironmentalReport",
   ],
   PROJECT_MANAGER: [
     "getTenant",
     "getUsers",
     "getContracts",
+    "getExpiringContracts",
     "createContract",
+    "uploadContractDocument",
     "approveWorkflowStep",
     "assignUserRole",
   ],

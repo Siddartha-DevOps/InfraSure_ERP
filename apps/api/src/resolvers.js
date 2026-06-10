@@ -48,6 +48,23 @@ export const resolvers = {
       return prisma.contract.findMany({ where: { tenant_id: args.tenant_id } });
     },
 
+    // Expiry alerts: contracts whose expiry_date falls within the next N days
+    // (defaults to 30), soonest first. Excludes already-expired by default? No —
+    // include from now forward so imminent + just-lapsed both surface.
+    getExpiringContracts: async (_p, args, { user }) => {
+      authorize("getExpiringContracts", args, user);
+      const withinDays = args.withinDays ?? 30;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + withinDays);
+      return prisma.contract.findMany({
+        where: {
+          tenant_id: args.tenant_id,
+          expiry_date: { lte: cutoff },
+        },
+        orderBy: { expiry_date: "asc" },
+      });
+    },
+
     getFinanceRecords: async (_p, args, { user }) => {
       authorize("getFinanceRecords", args, user);
       return prisma.finance.findMany({ where: { tenant_id: args.tenant_id } });

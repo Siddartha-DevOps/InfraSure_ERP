@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { gql } from "./api.js";
+import { gql, uploadContractDocument, API_ORIGIN } from "./api.js";
+
+// Days-until-expiry helper for the expiry-alert highlighting.
+function daysUntil(iso) {
+  if (!iso) return Infinity;
+  return Math.ceil((new Date(iso) - new Date()) / 86400000);
+}
 
 // Role → dashboard sections, mirroring the API RBAC design.
 const NAV_BY_ROLE = {
@@ -77,21 +83,32 @@ function Dashboard({ session, onLogout }) {
   const { user, tenant } = session;
   const tabs = NAV_BY_ROLE[user.role] || [];
   const [tab, setTab] = useState(tabs[0] || "portfolio");
-  const [data, setData] = useState({ contracts: [], finance: [], safety: [] });
+  const [data, setData] = useState({
+    contracts: [],
+    expiring: [],
+    finance: [],
+    safety: [],
+  });
   const [err, setErr] = useState("");
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     async function load() {
       setErr("");
       try {
         const t = user.tenant_id;
-        const out = { contracts: [], finance: [], safety: [] };
+        const out = { contracts: [], expiring: [], finance: [], safety: [] };
         if (tabs.includes("contracts") || tabs.includes("portfolio")) {
           const d = await gql(
-            `query($t:ID!){getContracts(tenant_id:$t){contract_id title status expiry_date}}`,
+            `query($t:ID!){getContracts(tenant_id:$t){contract_id title status expiry_date document_url version}}`,
             { t }
           ).catch(() => ({ getContracts: [] }));
           out.contracts = d.getContracts || [];
+          const e = await gql(
+            `query($t:ID!){getExpiringContracts(tenant_id:$t,withinDays:30){contract_id title status expiry_date}}`,
+            { t }
+          ).catch(() => ({ getExpiringContracts: [] }));
+          out.expiring = e.getExpiringContracts || [];
         }
         if (tabs.includes("finance")) {
           const d = await gql(
@@ -113,7 +130,22 @@ function Dashboard({ session, onLogout }) {
       }
     }
     load();
-  }, [tab, user.tenant_id]);
+  }, [tab, user.tenant_id, reload]);
+
+  const canUpload = ["ADMIN", "PROJECT_MANAGER", "COMPLIANCE_OFFICER"].includes(
+    user.role
+  );
+
+  async function handleUpload(contractId, file) {
+    if (!file) return;
+    setErr("");
+    try {
+      await uploadContractDocument(contractId, user.tenant_id, file);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -164,6 +196,33 @@ function Dashboard({ session, onLogout }) {
                 <li>Role view: {user.role}</li>
               </ul>
             </Card>
+            <Card title="Expiry Alerts (next 30 days)">
+              {data.expiring.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  No contracts expiring soon. ✅
+                </p>
+              ) : (
+                <ul className="text-sm space-y-1">
+                  {data.expiring.map((c) => {
+                    const d = daysUntil(c.expiry_date);
+                    return (
+                      <li key={c.contract_id} className="flex justify-between">
+                        <span className="text-slate-700">{c.title}</span>
+                        <span
+                          className={
+                            d < 0
+                              ? "text-red-600 font-medium"
+                              : "text-amber-600 font-medium"
+                          }
+                        >
+                          {d < 0 ? `expired ${-d}d ago` : `in ${d}d`}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
           </>
         )}
 
@@ -175,16 +234,53 @@ function Dashboard({ session, onLogout }) {
                   <th className="py-1">Title</th>
                   <th>Status</th>
                   <th>Expiry</th>
+                  <th>Document</th>
                 </tr>
               </thead>
               <tbody>
-                {data.contracts.map((c) => (
-                  <tr key={c.contract_id} className="border-t">
-                    <td className="py-2">{c.title}</td>
-                    <td>{c.status}</td>
-                    <td>{(c.expiry_date || "").slice(0, 10)}</td>
-                  </tr>
-                ))}
+                {data.contracts.map((c) => {
+                  const d = daysUntil(c.expiry_date);
+                  const soon = d <= 30;
+                  return (
+                    <tr key={c.contract_id} className="border-t align-middle">
+                      <td className="py-2">{c.title}</td>
+                      <td>{c.status}</td>
+                      <td className={soon ? "text-amber-600 font-medium" : ""}>
+                        {(c.expiry_date || "").slice(0, 10)}
+                        {soon && (
+                          <span className="ml-1 text-xs">
+                            {d < 0 ? "(expired)" : `(${d}d)`}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {c.document_url ? (
+                          <a
+                            href={`${API_ORIGIN}${c.document_url}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 underline"
+                          >
+                            view
+                          </a>
+                        ) : canUpload ? (
+                          <label className="text-slate-500 cursor-pointer underline">
+                            upload
+                            <input
+                              type="file"
+                              className="hidden"
+                              onChange={(e) =>
+                                handleUpload(c.contract_id, e.target.files[0])
+                              }
+                            />
+                          </label>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </Card>
