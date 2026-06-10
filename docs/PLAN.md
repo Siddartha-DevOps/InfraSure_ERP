@@ -68,6 +68,29 @@ Vendor certification rate · Audit readiness score · Average alert resolution t
 - **Web UI:** login, role-based navigation, Portfolio + Project dashboards, Contracts screens.
 - **Seed data:** one demo tenant + a user per role to click through immediately.
 
+## 6b. Phase 2 — concrete deliverable (Compliance core)
+
+Built on the Phase 1 foundation; same architecture, no rework.
+
+- **Financial Compliance:** `Finance` records with invoice no. + filing period; GST **and
+  TDS** filing, RA-bill approval, and **payment recording** (drives payment-aging /
+  overdue KPI). Mutations: `createFinanceRecord`, `fileGST`, `fileTDS`, `approveRABill`,
+  `recordPayment`.
+- **Safety & Environment:** safety audits gain `site_name` + `ppe_compliance` %; new
+  `EnvironmentalLog` for pollution/waste readings. Mutations: `logSafetyAudit` (extended),
+  `logEnvironmentalLog`.
+- **Labour & RERA:** new `LabourFiling` (PF / ESI / wage register) and `ReraFiling`
+  modules with status workflows. Mutations: `createLabourFiling`,
+  `updateLabourFilingStatus`, `createReraFiling`, `updateReraFilingStatus`.
+- **KPIs & dashboard:** `getComplianceKPIs` computes GST/TDS filing %, RA-bill approval %,
+  safety-audit completion %, avg PPE %, PF/ESI filing %, RERA filing %, overdue payments,
+  and a composite **audit-readiness score** — surfaced in a new role-aware Compliance
+  dashboard plus a Portfolio readiness tile.
+- **RBAC + audit:** every new query/mutation is role-gated and every mutation is
+  audit-logged to MongoDB, consistent with Phase 1.
+- **Seed:** sample finance / safety / environment / labour / RERA records (incl. an overdue
+  bill) so KPIs render immediately.
+
 ## 7. Decisions (Phase 1)
 
 - **API:** GraphQL for data/dashboard queries; REST only for file uploads.

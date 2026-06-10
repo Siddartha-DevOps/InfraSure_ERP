@@ -9,11 +9,27 @@ function daysUntil(iso) {
 
 // Role → dashboard sections, mirroring the API RBAC design.
 const NAV_BY_ROLE = {
-  ADMIN: ["portfolio", "contracts", "finance", "safety"],
-  PROJECT_MANAGER: ["portfolio", "contracts"],
-  COMPLIANCE_OFFICER: ["contracts", "safety"],
-  ACCOUNTANT: ["finance"],
-  ENGINEER: ["safety", "contracts"],
+  ADMIN: [
+    "portfolio",
+    "compliance",
+    "contracts",
+    "finance",
+    "safety",
+    "environment",
+    "labour",
+    "rera",
+  ],
+  PROJECT_MANAGER: ["portfolio", "compliance", "contracts", "finance", "rera"],
+  COMPLIANCE_OFFICER: [
+    "compliance",
+    "contracts",
+    "safety",
+    "environment",
+    "labour",
+    "rera",
+  ],
+  ACCOUNTANT: ["compliance", "finance", "labour"],
+  ENGINEER: ["safety", "environment", "contracts"],
 };
 
 function Login({ onLogin }) {
@@ -70,12 +86,51 @@ function Login({ onLogin }) {
   );
 }
 
-function Card({ title, children }) {
+function Card({ title, children, wide }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-5">
+    <div
+      className={`bg-white rounded-xl shadow-sm p-5 ${wide ? "md:col-span-2" : ""}`}
+    >
       <h3 className="font-semibold text-slate-700 mb-3">{title}</h3>
       {children}
     </div>
+  );
+}
+
+// A single KPI tile; colour reflects how healthy the percentage is.
+function Kpi({ label, value, suffix = "%" }) {
+  const n = typeof value === "number" ? value : 0;
+  const tone =
+    suffix !== "%"
+      ? "text-slate-800"
+      : n >= 85
+      ? "text-emerald-600"
+      : n >= 60
+      ? "text-amber-600"
+      : "text-red-600";
+  return (
+    <div className="bg-slate-50 rounded-lg p-4">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className={`text-2xl font-bold ${tone}`}>
+        {value}
+        {suffix}
+      </p>
+    </div>
+  );
+}
+
+const STATUS_TONE = {
+  FILED: "text-emerald-600",
+  APPROVED: "text-emerald-600",
+  COMPLETED: "text-emerald-600",
+  PENDING: "text-amber-600",
+  FAILED: "text-red-600",
+};
+function StatusPill({ value }) {
+  return (
+    <span className={`font-medium ${STATUS_TONE[value] || "text-slate-600"}`}>
+      {value}
+    </span>
   );
 }
 
@@ -88,6 +143,10 @@ function Dashboard({ session, onLogout }) {
     expiring: [],
     finance: [],
     safety: [],
+    environment: [],
+    labour: [],
+    rera: [],
+    kpis: null,
   });
   const [err, setErr] = useState("");
   const [reload, setReload] = useState(0);
@@ -95,34 +154,97 @@ function Dashboard({ session, onLogout }) {
   useEffect(() => {
     async function load() {
       setErr("");
+      const t = user.tenant_id;
+      const out = {
+        contracts: [],
+        expiring: [],
+        finance: [],
+        safety: [],
+        environment: [],
+        labour: [],
+        rera: [],
+        kpis: null,
+      };
+      const safe = (p, fb) => p.then((d) => d).catch(() => fb);
+
       try {
-        const t = user.tenant_id;
-        const out = { contracts: [], expiring: [], finance: [], safety: [] };
         if (tabs.includes("contracts") || tabs.includes("portfolio")) {
-          const d = await gql(
-            `query($t:ID!){getContracts(tenant_id:$t){contract_id title status expiry_date document_url version}}`,
-            { t }
-          ).catch(() => ({ getContracts: [] }));
+          const d = await safe(
+            gql(
+              `query($t:ID!){getContracts(tenant_id:$t){contract_id title status expiry_date document_url version}}`,
+              { t }
+            ),
+            { getContracts: [] }
+          );
           out.contracts = d.getContracts || [];
-          const e = await gql(
-            `query($t:ID!){getExpiringContracts(tenant_id:$t,withinDays:30){contract_id title status expiry_date}}`,
-            { t }
-          ).catch(() => ({ getExpiringContracts: [] }));
+          const e = await safe(
+            gql(
+              `query($t:ID!){getExpiringContracts(tenant_id:$t,withinDays:30){contract_id title status expiry_date}}`,
+              { t }
+            ),
+            { getExpiringContracts: [] }
+          );
           out.expiring = e.getExpiringContracts || [];
         }
+        if (tabs.includes("compliance") || tabs.includes("portfolio")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getComplianceKPIs(tenant_id:$t){gst_filing_compliance tds_filing_compliance ra_bill_approval_rate safety_audit_completion avg_ppe_compliance pf_esi_filing_rate rera_filing_rate overdue_payments audit_readiness_score}}`,
+              { t }
+            ),
+            { getComplianceKPIs: null }
+          );
+          out.kpis = d.getComplianceKPIs;
+        }
         if (tabs.includes("finance")) {
-          const d = await gql(
-            `query($t:ID!){getFinanceRecords(tenant_id:$t){finance_id amount gst_filing_status ra_bill_status due_date}}`,
-            { t }
-          ).catch(() => ({ getFinanceRecords: [] }));
+          const d = await safe(
+            gql(
+              `query($t:ID!){getFinanceRecords(tenant_id:$t){finance_id invoice_number amount gst_filing_status tds_status ra_bill_status due_date paid_date}}`,
+              { t }
+            ),
+            { getFinanceRecords: [] }
+          );
           out.finance = d.getFinanceRecords || [];
         }
         if (tabs.includes("safety")) {
-          const d = await gql(
-            `query($t:ID!){getSafetyAudits(tenant_id:$t){safety_id checklist_status audit_date}}`,
-            { t }
-          ).catch(() => ({ getSafetyAudits: [] }));
+          const d = await safe(
+            gql(
+              `query($t:ID!){getSafetyAudits(tenant_id:$t){safety_id site_name checklist_status ppe_compliance audit_date}}`,
+              { t }
+            ),
+            { getSafetyAudits: [] }
+          );
           out.safety = d.getSafetyAudits || [];
+        }
+        if (tabs.includes("environment")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getEnvironmentalLogs(tenant_id:$t){env_log_id log_type reading unit notes recorded_at}}`,
+              { t }
+            ),
+            { getEnvironmentalLogs: [] }
+          );
+          out.environment = d.getEnvironmentalLogs || [];
+        }
+        if (tabs.includes("labour")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getLabourFilings(tenant_id:$t){labour_id filing_type period worker_count amount status filed_date}}`,
+              { t }
+            ),
+            { getLabourFilings: [] }
+          );
+          out.labour = d.getLabourFilings || [];
+        }
+        if (tabs.includes("rera")) {
+          const d = await safe(
+            gql(
+              `query($t:ID!){getReraFilings(tenant_id:$t){filing_id project_name filing_type status due_date filed_date}}`,
+              { t }
+            ),
+            { getReraFilings: [] }
+          );
+          out.rera = d.getReraFilings || [];
         }
         setData(out);
       } catch (e) {
@@ -135,13 +257,25 @@ function Dashboard({ session, onLogout }) {
   const canUpload = ["ADMIN", "PROJECT_MANAGER", "COMPLIANCE_OFFICER"].includes(
     user.role
   );
+  const refresh = () => setReload((n) => n + 1);
 
   async function handleUpload(contractId, file) {
     if (!file) return;
     setErr("");
     try {
       await uploadContractDocument(contractId, user.tenant_id, file);
-      setReload((n) => n + 1);
+      refresh();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  // Fire a mutation then refresh the active view.
+  async function mutate(query, variables) {
+    setErr("");
+    try {
+      await gql(query, { ...variables, t: user.tenant_id });
+      refresh();
     } catch (e) {
       setErr(e.message);
     }
@@ -164,7 +298,7 @@ function Dashboard({ session, onLogout }) {
         </div>
       </header>
 
-      <nav className="bg-white border-b px-6 flex gap-2">
+      <nav className="bg-white border-b px-6 flex gap-2 flex-wrap">
         {tabs.map((t) => (
           <button
             key={t}
@@ -190,11 +324,13 @@ function Dashboard({ session, onLogout }) {
                 {data.contracts.length}
               </p>
             </Card>
-            <Card title="Compliance Snapshot">
-              <ul className="text-sm text-slate-600 space-y-1">
-                <li>Contracts tracked: {data.contracts.length}</li>
-                <li>Role view: {user.role}</li>
-              </ul>
+            <Card title="Audit Readiness">
+              <p className="text-4xl font-bold text-emerald-600">
+                {data.kpis ? `${data.kpis.audit_readiness_score}%` : "—"}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Composite of all compliance KPIs
+              </p>
             </Card>
             <Card title="Expiry Alerts (next 30 days)">
               {data.expiring.length === 0 ? (
@@ -226,8 +362,28 @@ function Dashboard({ session, onLogout }) {
           </>
         )}
 
+        {tab === "compliance" && (
+          <Card title="Compliance KPIs" wide>
+            {!data.kpis ? (
+              <p className="text-sm text-slate-500">No KPI data.</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Kpi label="GST filing" value={data.kpis.gst_filing_compliance} />
+                <Kpi label="TDS filing" value={data.kpis.tds_filing_compliance} />
+                <Kpi label="RA bill approval" value={data.kpis.ra_bill_approval_rate} />
+                <Kpi label="Safety audits done" value={data.kpis.safety_audit_completion} />
+                <Kpi label="Avg PPE compliance" value={data.kpis.avg_ppe_compliance} />
+                <Kpi label="PF/ESI filing" value={data.kpis.pf_esi_filing_rate} />
+                <Kpi label="RERA filing" value={data.kpis.rera_filing_rate} />
+                <Kpi label="Overdue payments" value={data.kpis.overdue_payments} suffix="" />
+                <Kpi label="Audit readiness" value={data.kpis.audit_readiness_score} />
+              </div>
+            )}
+          </Card>
+        )}
+
         {tab === "contracts" && (
-          <Card title="Contracts">
+          <Card title="Contracts" wide>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-400">
@@ -287,21 +443,74 @@ function Dashboard({ session, onLogout }) {
         )}
 
         {tab === "finance" && (
-          <Card title="Finance Records">
+          <Card title="Financial Compliance" wide>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-400">
-                  <th className="py-1">Amount</th>
+                  <th className="py-1">Invoice</th>
+                  <th>Amount</th>
                   <th>GST</th>
+                  <th>TDS</th>
                   <th>RA Bill</th>
+                  <th>Payment</th>
                 </tr>
               </thead>
               <tbody>
-                {data.finance.map((f) => (
-                  <tr key={f.finance_id} className="border-t">
-                    <td className="py-2">₹{f.amount}</td>
-                    <td>{f.gst_filing_status}</td>
-                    <td>{f.ra_bill_status}</td>
+                {data.finance.map((f) => {
+                  const overdue =
+                    !f.paid_date && daysUntil(f.due_date) < 0;
+                  return (
+                    <tr key={f.finance_id} className="border-t">
+                      <td className="py-2">{f.invoice_number || "—"}</td>
+                      <td>₹{f.amount.toLocaleString("en-IN")}</td>
+                      <td><StatusPill value={f.gst_filing_status} /></td>
+                      <td><StatusPill value={f.tds_status} /></td>
+                      <td><StatusPill value={f.ra_bill_status} /></td>
+                      <td>
+                        {f.paid_date ? (
+                          <span className="text-emerald-600">paid</span>
+                        ) : overdue ? (
+                          <span className="text-red-600 font-medium">overdue</span>
+                        ) : (
+                          <span className="text-amber-600">due</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {tab === "safety" && (
+          <Card title="Safety Audits" wide>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-400">
+                  <th className="py-1">Site</th>
+                  <th>Audit date</th>
+                  <th>Status</th>
+                  <th>PPE %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.safety.map((s) => (
+                  <tr key={s.safety_id} className="border-t">
+                    <td className="py-2">{s.site_name || "—"}</td>
+                    <td>{(s.audit_date || "").slice(0, 10)}</td>
+                    <td><StatusPill value={s.checklist_status} /></td>
+                    <td
+                      className={
+                        s.ppe_compliance >= 85
+                          ? "text-emerald-600"
+                          : s.ppe_compliance >= 60
+                          ? "text-amber-600"
+                          : "text-red-600"
+                      }
+                    >
+                      {s.ppe_compliance}%
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -309,22 +518,122 @@ function Dashboard({ session, onLogout }) {
           </Card>
         )}
 
-        {tab === "safety" && (
-          <Card title="Safety Audits">
+        {tab === "environment" && (
+          <Card title="Environmental Logs (pollution / waste)" wide>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-400">
-                  <th className="py-1">Audit date</th>
-                  <th>Status</th>
+                  <th className="py-1">Type</th>
+                  <th>Reading</th>
+                  <th>Recorded</th>
+                  <th>Notes</th>
                 </tr>
               </thead>
               <tbody>
-                {data.safety.map((s) => (
-                  <tr key={s.safety_id} className="border-t">
-                    <td className="py-2">{(s.audit_date || "").slice(0, 10)}</td>
-                    <td>{s.checklist_status}</td>
+                {data.environment.map((e) => (
+                  <tr key={e.env_log_id} className="border-t">
+                    <td className="py-2">{e.log_type}</td>
+                    <td>
+                      {e.reading} {e.unit}
+                    </td>
+                    <td>{(e.recorded_at || "").slice(0, 10)}</td>
+                    <td className="text-slate-500">{e.notes || "—"}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {tab === "labour" && (
+          <Card title="Labour Compliance (PF / ESI / Wage)" wide>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-400">
+                  <th className="py-1">Type</th>
+                  <th>Period</th>
+                  <th>Workers</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  {canUpload && <th></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {data.labour.map((l) => (
+                  <tr key={l.labour_id} className="border-t">
+                    <td className="py-2">{l.filing_type}</td>
+                    <td>{l.period}</td>
+                    <td>{l.worker_count}</td>
+                    <td>₹{l.amount.toLocaleString("en-IN")}</td>
+                    <td><StatusPill value={l.status} /></td>
+                    {canUpload && (
+                      <td>
+                        {l.status !== "FILED" && (
+                          <button
+                            onClick={() =>
+                              mutate(
+                                `mutation($t:ID!,$id:ID!){updateLabourFilingStatus(tenant_id:$t,labour_id:$id,status:"FILED"){labour_id}}`,
+                                { id: l.labour_id }
+                              )
+                            }
+                            className="text-blue-600 underline text-xs"
+                          >
+                            mark filed
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {tab === "rera" && (
+          <Card title="RERA Filings" wide>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-400">
+                  <th className="py-1">Project</th>
+                  <th>Type</th>
+                  <th>Due</th>
+                  <th>Status</th>
+                  {canUpload && <th></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rera.map((r) => {
+                  const overdue =
+                    r.status === "PENDING" && daysUntil(r.due_date) < 0;
+                  return (
+                    <tr key={r.filing_id} className="border-t">
+                      <td className="py-2">{r.project_name}</td>
+                      <td>{r.filing_type}</td>
+                      <td className={overdue ? "text-red-600 font-medium" : ""}>
+                        {(r.due_date || "").slice(0, 10)}
+                      </td>
+                      <td><StatusPill value={r.status} /></td>
+                      {canUpload && (
+                        <td>
+                          {r.status === "PENDING" && (
+                            <button
+                              onClick={() =>
+                                mutate(
+                                  `mutation($t:ID!,$id:ID!){updateReraFilingStatus(tenant_id:$t,filing_id:$id,status:"FILED"){filing_id}}`,
+                                  { id: r.filing_id }
+                                )
+                              }
+                              className="text-blue-600 underline text-xs"
+                            >
+                              mark filed
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </Card>

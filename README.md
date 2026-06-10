@@ -55,6 +55,19 @@ npm run dev --workspace apps/web      # http://localhost:5173
 
 Default demo credentials are printed by the seed script.
 
+## Phase 2 scope (Compliance core)
+
+- **Financial Compliance:** GST + TDS filing, RA-bill approval, payment recording &
+  overdue tracking (`createFinanceRecord`, `fileGST`, `fileTDS`, `approveRABill`, `recordPayment`).
+- **Safety & Environment:** safety audits with site + PPE-compliance %, and pollution/waste
+  environmental logs (`logSafetyAudit`, `logEnvironmentalLog`).
+- **Labour & RERA:** PF/ESI/wage-register filings and RERA filings with status workflows
+  (`createLabourFiling`, `updateLabourFilingStatus`, `createReraFiling`, `updateReraFilingStatus`).
+- **Compliance KPIs dashboard:** `getComplianceKPIs` computes filing %, approval %, safety
+  completion %, PF/ESI/RERA rates, overdue payments, and a composite audit-readiness score.
+
+All new operations are RBAC-gated per role and every mutation is audit-logged to MongoDB.
+
 ## Contract document upload (REST)
 
 File uploads stay on REST (per the Phase 1 decision); everything else is GraphQL.
