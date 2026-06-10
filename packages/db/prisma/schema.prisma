@@ -1,0 +1,146 @@
+// InfraSure ERP — PostgreSQL schema (shared-schema multi-tenancy).
+// Every business table carries tenant_id for strict tenant isolation.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ENGINEER
+  ACCOUNTANT
+  COMPLIANCE_OFFICER
+  PROJECT_MANAGER
+  ADMIN
+}
+
+model Tenant {
+  tenant_id         String   @id @default(uuid())
+  company_name      String
+  gst_number        String?
+  rera_id           String?
+  subscription_plan String   @default("BASIC")
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  users         User[]
+  subscriptions Subscription[]
+  contracts     Contract[]
+  finances      Finance[]
+  safetyAudits  Safety[]
+  dprs          Dpr[]
+  envReports    EnvironmentalReport[]
+  workflowSteps WorkflowStep[]
+}
+
+model User {
+  user_id       String    @id @default(uuid())
+  tenant_id     String
+  email         String    @unique
+  password_hash String
+  role          Role
+  status        String    @default("ACTIVE")
+  created_at    DateTime  @default(now())
+  last_login    DateTime?
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+model Subscription {
+  subscription_id    String   @id @default(uuid())
+  tenant_id          String
+  plan_type          String   @default("BASIC")
+  billing_cycle      String   @default("MONTHLY")
+  stripe_customer_id String?
+  status             String   @default("ACTIVE")
+  created_at         DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+model Contract {
+  contract_id  String   @id @default(uuid())
+  tenant_id    String
+  title        String
+  expiry_date  DateTime
+  status       String   @default("DRAFT")
+  document_url String?
+  version      Int      @default(1)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+model Finance {
+  finance_id        String   @id @default(uuid())
+  tenant_id         String
+  gst_filing_status String   @default("PENDING")
+  tds_status        String   @default("PENDING")
+  ra_bill_status    String   @default("PENDING")
+  amount            Float    @default(0)
+  due_date          DateTime
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+model Safety {
+  safety_id           String   @id @default(uuid())
+  tenant_id           String
+  audit_date          DateTime @default(now())
+  checklist_status    String   @default("PENDING")
+  incident_report_url String?
+  created_at          DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+model Dpr {
+  dpr_id      String   @id @default(uuid())
+  tenant_id   String
+  report_data String
+  created_at  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+model EnvironmentalReport {
+  report_id   String   @id @default(uuid())
+  tenant_id   String
+  report_data String
+  created_at  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+model WorkflowStep {
+  step_id    String   @id @default(uuid())
+  tenant_id  String
+  name       String   @default("Compliance step")
+  status     String   @default("PENDING")
+  created_at DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
