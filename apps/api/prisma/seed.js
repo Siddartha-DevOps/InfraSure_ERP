@@ -195,6 +195,33 @@ async function main() {
     ],
   });
 
+  // --- Geo-tagged project sites (real Indian coordinates) for the map ---
+  await prisma.site.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        name: "Highway Phase II — Site A",
+        latitude: 12.9716,
+        longitude: 77.5946, // Bengaluru
+        status: "COMPLIANT",
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        name: "Skyline Residency — Tower B",
+        latitude: 17.385,
+        longitude: 78.4867, // Hyderabad
+        status: "PENDING",
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        name: "Coastal Embankment Works",
+        latitude: 13.0827,
+        longitude: 80.2707, // Chennai
+        status: "NON_COMPLIANT",
+      },
+    ],
+  });
+
   await prisma.workflowStep.create({
     data: { tenant_id: tenant.tenant_id, name: "Approve RA Bill #1" },
   });

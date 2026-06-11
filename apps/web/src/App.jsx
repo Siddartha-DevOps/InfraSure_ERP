@@ -3,6 +3,8 @@ import { gql, uploadContractDocument } from "./api.js";
 import { Sidebar, TopBar } from "./layout.jsx";
 import { buildAlerts } from "./alerts.js";
 import { Button, inputCls } from "./ui.jsx";
+import { ProjectMap } from "./ProjectMap.jsx";
+import { useI18n } from "./i18n.jsx";
 import {
   EngineerHome,
   AccountantHome,
@@ -45,6 +47,7 @@ const NAV_BY_ROLE = {
     "rera",
     "vendors",
     "disputes",
+    "map",
     "billing",
     "integrations",
   ],
@@ -58,6 +61,7 @@ const NAV_BY_ROLE = {
     "rera",
     "vendors",
     "disputes",
+    "map",
   ],
   COMPLIANCE_OFFICER: [
     "home",
@@ -71,9 +75,10 @@ const NAV_BY_ROLE = {
     "rera",
     "vendors",
     "disputes",
+    "map",
   ],
   ACCOUNTANT: ["home", "compliance", "audit", "ai", "finance", "labour"],
-  ENGINEER: ["home", "safety", "environment", "contracts", "ai"],
+  ENGINEER: ["home", "safety", "environment", "contracts", "ai", "map"],
 };
 
 // Datasets each role's screens need (fetched once per reload).
@@ -93,6 +98,7 @@ const DATASETS_BY_ROLE = {
     "dprs",
     "steps",
     "labour",
+    "sites",
   ],
   COMPLIANCE_OFFICER: [
     "contracts",
@@ -107,9 +113,20 @@ const DATASETS_BY_ROLE = {
     "audit",
     "ai",
     "steps",
+    "sites",
   ],
   ACCOUNTANT: ["finance", "labour", "kpis", "audit", "ai"],
-  ENGINEER: ["contracts", "expiring", "safety", "environment", "kpis", "ai", "dprs", "steps"],
+  ENGINEER: [
+    "contracts",
+    "expiring",
+    "safety",
+    "environment",
+    "kpis",
+    "ai",
+    "dprs",
+    "steps",
+    "sites",
+  ],
 };
 
 const QUERIES = {
@@ -127,6 +144,7 @@ const QUERIES = {
   ai: `query($t:ID!){getAIInsights(tenant_id:$t){available predictive_score risk_level weak_factors anomalies{finance_id type severity detail}}}`,
   dprs: `query($t:ID!){getDPRs(tenant_id:$t){dpr_id report_data created_at}}`,
   steps: `query($t:ID!){getWorkflowSteps(tenant_id:$t){step_id name status}}`,
+  sites: `query($t:ID!){getSites(tenant_id:$t){site_id name latitude longitude status}}`,
   integrations: `query($t:ID!){getIntegrationStatus(tenant_id:$t){integration configured driver}}`,
   subscription: `query($t:ID!){getSubscription(tenant_id:$t){plan_type billing_cycle status current_period_end}}`,
   tiers: `query{getBillingTiers{code name price_inr features}}`,
@@ -147,6 +165,7 @@ const FIELD_OF = {
   ai: "getAIInsights",
   dprs: "getDPRs",
   steps: "getWorkflowSteps",
+  sites: "getSites",
   integrations: "getIntegrationStatus",
   subscription: "getSubscription",
   tiers: "getBillingTiers",
@@ -164,6 +183,7 @@ const EMPTY = {
   disputes: [],
   dprs: [],
   steps: [],
+  sites: [],
   integrations: [],
   tiers: [],
   kpis: null,
@@ -173,6 +193,7 @@ const EMPTY = {
 };
 
 function Login({ onLogin }) {
+  const { t } = useI18n();
   const [email, setEmail] = useState("admin@demo.test");
   const [password, setPassword] = useState("Passw0rd!");
   const [error, setError] = useState("");
@@ -204,23 +225,23 @@ function Login({ onLogin }) {
         aria-label="Sign in"
       >
         <div>
-          <h1 className="text-2xl font-bold text-primary">InfraSure ERP</h1>
-          <p className="text-sm text-neutral">Construction compliance platform</p>
+          <h1 className="text-2xl font-bold text-primary">{t("auth.title")}</h1>
+          <p className="text-sm text-neutral">{t("auth.subtitle")}</p>
         </div>
         <input
           className={inputCls}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          aria-label="Email"
+          placeholder={t("auth.email")}
+          aria-label={t("auth.email")}
         />
         <input
           type="password"
           className={inputCls}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          aria-label="Password"
+          placeholder={t("auth.password")}
+          aria-label={t("auth.password")}
         />
         {error && (
           <p className="text-danger text-sm" role="alert">
@@ -228,7 +249,7 @@ function Login({ onLogin }) {
           </p>
         )}
         <Button type="submit" style={{ width: "100%" }}>
-          Sign in
+          {t("auth.signin")}
         </Button>
       </form>
     </div>
@@ -236,6 +257,7 @@ function Login({ onLogin }) {
 }
 
 function Dashboard({ session, onLogout }) {
+  const { t: tr } = useI18n();
   const { user, tenant } = session;
   const tabs = NAV_BY_ROLE[user.role] || ["home"];
   const [tab, setTab] = useState("home");
@@ -335,14 +357,14 @@ function Dashboard({ session, onLogout }) {
 
   const quickActions = {
     ENGINEER: [
-      { label: "New DPR", onClick: () => setModal("dpr") },
-      { label: "Log Safety Audit", onClick: () => setModal("safety") },
+      { label: tr("qa.newDPR"), onClick: () => setModal("dpr") },
+      { label: tr("qa.logSafety"), onClick: () => setModal("safety") },
     ],
-    ACCOUNTANT: [{ label: "New Finance Record", onClick: () => setModal("finance") }],
-    PROJECT_MANAGER: [{ label: "New Contract", onClick: () => setModal("contract") }],
+    ACCOUNTANT: [{ label: tr("qa.newFinance"), onClick: () => setModal("finance") }],
+    PROJECT_MANAGER: [{ label: tr("qa.newContract"), onClick: () => setModal("contract") }],
     ADMIN: [
-      { label: "New Contract", onClick: () => setModal("contract") },
-      { label: "New Finance Record", onClick: () => setModal("finance") },
+      { label: tr("qa.newContract"), onClick: () => setModal("contract") },
+      { label: tr("qa.newFinance"), onClick: () => setModal("finance") },
     ],
     COMPLIANCE_OFFICER: [],
   }[user.role];
@@ -378,6 +400,7 @@ function Dashboard({ session, onLogout }) {
           )}
 
           {tab === "home" && home}
+          {tab === "map" && <ProjectMap sites={data.sites} />}
           {tab === "compliance" && <ComplianceModule data={data} />}
           {tab === "audit" && <AuditModule data={data} />}
           {tab === "ai" && <AIModule data={data} />}

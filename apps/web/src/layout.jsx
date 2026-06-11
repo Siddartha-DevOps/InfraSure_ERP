@@ -1,25 +1,28 @@
 // App shell: left sidebar (modules + quick actions) and top bar (alerts, profile).
 import { useState } from "react";
 import { AlertsFeed } from "./ui.jsx";
+import { useI18n, LANGUAGES } from "./i18n.jsx";
 
-const MODULE_META = {
-  home: { label: "Dashboard", icon: "🏠" },
-  compliance: { label: "Compliance KPIs", icon: "📊" },
-  audit: { label: "Audit Readiness", icon: "🗂️" },
-  ai: { label: "AI Insights", icon: "🤖" },
-  contracts: { label: "Contracts", icon: "📃" },
-  finance: { label: "Finance", icon: "💰" },
-  safety: { label: "Safety", icon: "🦺" },
-  environment: { label: "Environment", icon: "🌿" },
-  labour: { label: "Labour", icon: "👷" },
-  rera: { label: "RERA", icon: "🏛️" },
-  vendors: { label: "Vendors", icon: "🤝" },
-  disputes: { label: "Disputes", icon: "⚖️" },
-  billing: { label: "Billing", icon: "💳" },
-  integrations: { label: "Integrations", icon: "🔌" },
+const MODULE_ICON = {
+  home: "🏠",
+  compliance: "📊",
+  audit: "🗂️",
+  ai: "🤖",
+  contracts: "📃",
+  finance: "💰",
+  safety: "🦺",
+  environment: "🌿",
+  labour: "👷",
+  rera: "🏛️",
+  vendors: "🤝",
+  disputes: "⚖️",
+  billing: "💳",
+  integrations: "🔌",
+  map: "🗺️",
 };
 
 export function Sidebar({ tabs, tab, setTab, quickActions }) {
+  const { t: tr } = useI18n();
   return (
     <aside
       className="w-60 shrink-0 bg-primary text-white min-h-screen flex flex-col"
@@ -27,12 +30,12 @@ export function Sidebar({ tabs, tab, setTab, quickActions }) {
     >
       <div className="px-5 py-5 border-b border-white/10">
         <p className="font-bold text-lg leading-tight">InfraSure ERP</p>
-        <p className="text-xs text-white/60">Construction compliance</p>
+        <p className="text-xs text-white/60">{tr("app.tagline")}</p>
       </div>
 
       <nav className="flex-1 py-3" aria-label="Modules">
         {tabs.map((t) => {
-          const m = MODULE_META[t] || { label: t, icon: "▫️" };
+          const m = { label: tr(`nav.${t}`), icon: MODULE_ICON[t] || "▫️" };
           const active = tab === t;
           return (
             <button
@@ -55,7 +58,7 @@ export function Sidebar({ tabs, tab, setTab, quickActions }) {
       {quickActions?.length > 0 && (
         <div className="px-5 py-4 border-t border-white/10">
           <p className="text-xs uppercase tracking-wide text-white/50 mb-2">
-            Quick actions
+            {tr("qa.title")}
           </p>
           <div className="space-y-2">
             {quickActions.map((qa) => (
@@ -76,16 +79,33 @@ export function Sidebar({ tabs, tab, setTab, quickActions }) {
 
 export function TopBar({ user, tenant, alerts, onLogout }) {
   const [open, setOpen] = useState(false);
+  const { t: tr, lang, setLang } = useI18n();
   const critical = alerts.filter((a) => a.severity === "critical").length;
 
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
       <div>
         <p className="font-semibold text-gray-800">{tenant.company_name}</p>
-        <p className="text-xs text-neutral">Tenant workspace</p>
+        <p className="text-xs text-neutral">{tr("top.workspace")}</p>
       </div>
 
       <div className="flex items-center gap-4">
+        <label className="sr-only" htmlFor="lang-select">
+          Language
+        </label>
+        <select
+          id="lang-select"
+          value={lang}
+          onChange={(e) => setLang(e.target.value)}
+          className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="Language"
+        >
+          {LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.label}
+            </option>
+          ))}
+        </select>
         <div className="relative">
           <button
             onClick={() => setOpen((o) => !o)}
@@ -106,7 +126,7 @@ export function TopBar({ user, tenant, alerts, onLogout }) {
           </button>
           {open && (
             <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-gray-200 p-4 z-50">
-              <h4 className="font-semibold text-gray-800 mb-3">Alerts</h4>
+              <h4 className="font-semibold text-gray-800 mb-3">{tr("top.alerts")}</h4>
               <AlertsFeed alerts={alerts} compact />
             </div>
           )}
@@ -131,7 +151,7 @@ export function TopBar({ user, tenant, alerts, onLogout }) {
           onClick={onLogout}
           className="text-sm text-neutral hover:text-gray-800 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
         >
-          Logout
+          {tr("top.logout")}
         </button>
       </div>
     </header>

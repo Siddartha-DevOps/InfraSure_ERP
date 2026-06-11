@@ -39,6 +39,7 @@ model Tenant {
   reraFilings   ReraFiling[]
   vendors       Vendor[]
   disputes      Dispute[]
+  sites         Site[]
   workflowSteps WorkflowStep[]
 }
 
@@ -222,6 +223,21 @@ model EnvironmentalReport {
   tenant_id   String
   report_data String
   created_at  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// Geo-tagged project sites for the compliance map.
+model Site {
+  site_id    String   @id @default(uuid())
+  tenant_id  String
+  name       String
+  latitude   Float
+  longitude  Float
+  status     String   @default("PENDING") // COMPLIANT | PENDING | NON_COMPLIANT
+  created_at DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 
