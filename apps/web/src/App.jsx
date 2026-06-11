@@ -1,16 +1,39 @@
-import { useEffect, useState } from "react";
-import { gql, uploadContractDocument, API_ORIGIN } from "./api.js";
+import { useEffect, useMemo, useState } from "react";
+import { gql, uploadContractDocument } from "./api.js";
+import { Sidebar, TopBar } from "./layout.jsx";
+import { buildAlerts } from "./alerts.js";
+import { Button, inputCls } from "./ui.jsx";
+import {
+  EngineerHome,
+  AccountantHome,
+  OfficerHome,
+  PMHome,
+} from "./dashboards.jsx";
+import {
+  ComplianceModule,
+  AuditModule,
+  AIModule,
+  ContractsModule,
+  SafetyModule,
+  EnvironmentModule,
+  LabourModule,
+  ReraModule,
+  VendorsModule,
+  DisputesModule,
+  BillingModule,
+  IntegrationsModule,
+} from "./modules.jsx";
+import {
+  NewDPRModal,
+  SafetyAuditModal,
+  FinanceModal,
+  ContractModal,
+} from "./forms.jsx";
 
-// Days-until-expiry helper for the expiry-alert highlighting.
-function daysUntil(iso) {
-  if (!iso) return Infinity;
-  return Math.ceil((new Date(iso) - new Date()) / 86400000);
-}
-
-// Role → dashboard sections, mirroring the API RBAC design.
+// Role → sidebar modules ("home" is the role-specific dashboard).
 const NAV_BY_ROLE = {
   ADMIN: [
-    "portfolio",
+    "home",
     "compliance",
     "audit",
     "ai",
@@ -26,7 +49,7 @@ const NAV_BY_ROLE = {
     "integrations",
   ],
   PROJECT_MANAGER: [
-    "portfolio",
+    "home",
     "compliance",
     "audit",
     "ai",
@@ -37,6 +60,7 @@ const NAV_BY_ROLE = {
     "disputes",
   ],
   COMPLIANCE_OFFICER: [
+    "home",
     "compliance",
     "audit",
     "ai",
@@ -48,8 +72,104 @@ const NAV_BY_ROLE = {
     "vendors",
     "disputes",
   ],
-  ACCOUNTANT: ["compliance", "audit", "ai", "finance", "labour"],
-  ENGINEER: ["safety", "environment", "contracts", "ai"],
+  ACCOUNTANT: ["home", "compliance", "audit", "ai", "finance", "labour"],
+  ENGINEER: ["home", "safety", "environment", "contracts", "ai"],
+};
+
+// Datasets each role's screens need (fetched once per reload).
+const DATASETS_BY_ROLE = {
+  ADMIN: "all",
+  PROJECT_MANAGER: [
+    "contracts",
+    "expiring",
+    "finance",
+    "safety",
+    "rera",
+    "vendors",
+    "disputes",
+    "kpis",
+    "audit",
+    "ai",
+    "dprs",
+    "steps",
+    "labour",
+  ],
+  COMPLIANCE_OFFICER: [
+    "contracts",
+    "expiring",
+    "safety",
+    "environment",
+    "labour",
+    "rera",
+    "vendors",
+    "disputes",
+    "kpis",
+    "audit",
+    "ai",
+    "steps",
+  ],
+  ACCOUNTANT: ["finance", "labour", "kpis", "audit", "ai"],
+  ENGINEER: ["contracts", "expiring", "safety", "environment", "kpis", "ai", "dprs", "steps"],
+};
+
+const QUERIES = {
+  contracts: `query($t:ID!){getContracts(tenant_id:$t){contract_id title status expiry_date document_url version}}`,
+  expiring: `query($t:ID!){getExpiringContracts(tenant_id:$t,withinDays:30){contract_id title status expiry_date}}`,
+  finance: `query($t:ID!){getFinanceRecords(tenant_id:$t){finance_id invoice_number amount gst_filing_status tds_status ra_bill_status due_date paid_date}}`,
+  safety: `query($t:ID!){getSafetyAudits(tenant_id:$t){safety_id site_name checklist_status ppe_compliance audit_date}}`,
+  environment: `query($t:ID!){getEnvironmentalLogs(tenant_id:$t){env_log_id log_type reading unit notes recorded_at}}`,
+  labour: `query($t:ID!){getLabourFilings(tenant_id:$t){labour_id filing_type period worker_count amount status filed_date}}`,
+  rera: `query($t:ID!){getReraFilings(tenant_id:$t){filing_id project_name filing_type status due_date filed_date}}`,
+  vendors: `query($t:ID!){getVendors(tenant_id:$t){vendor_id name gst_number certification_name certification_expiry status}}`,
+  disputes: `query($t:ID!){getDisputes(tenant_id:$t){dispute_id title dispute_type counterparty amount status escalation_level}}`,
+  kpis: `query($t:ID!){getComplianceKPIs(tenant_id:$t){gst_filing_compliance tds_filing_compliance ra_bill_approval_rate safety_audit_completion avg_ppe_compliance pf_esi_filing_rate rera_filing_rate overdue_payments audit_readiness_score}}`,
+  audit: `query($t:ID!){getAuditReadiness(tenant_id:$t){documents_verified documents_total pending_approvals open_disputes vendor_compliance_rate audit_readiness_score}}`,
+  ai: `query($t:ID!){getAIInsights(tenant_id:$t){available predictive_score risk_level weak_factors anomalies{finance_id type severity detail}}}`,
+  dprs: `query($t:ID!){getDPRs(tenant_id:$t){dpr_id report_data created_at}}`,
+  steps: `query($t:ID!){getWorkflowSteps(tenant_id:$t){step_id name status}}`,
+  integrations: `query($t:ID!){getIntegrationStatus(tenant_id:$t){integration configured driver}}`,
+  subscription: `query($t:ID!){getSubscription(tenant_id:$t){plan_type billing_cycle status current_period_end}}`,
+  tiers: `query{getBillingTiers{code name price_inr features}}`,
+};
+
+const FIELD_OF = {
+  contracts: "getContracts",
+  expiring: "getExpiringContracts",
+  finance: "getFinanceRecords",
+  safety: "getSafetyAudits",
+  environment: "getEnvironmentalLogs",
+  labour: "getLabourFilings",
+  rera: "getReraFilings",
+  vendors: "getVendors",
+  disputes: "getDisputes",
+  kpis: "getComplianceKPIs",
+  audit: "getAuditReadiness",
+  ai: "getAIInsights",
+  dprs: "getDPRs",
+  steps: "getWorkflowSteps",
+  integrations: "getIntegrationStatus",
+  subscription: "getSubscription",
+  tiers: "getBillingTiers",
+};
+
+const EMPTY = {
+  contracts: [],
+  expiring: [],
+  finance: [],
+  safety: [],
+  environment: [],
+  labour: [],
+  rera: [],
+  vendors: [],
+  disputes: [],
+  dprs: [],
+  steps: [],
+  integrations: [],
+  tiers: [],
+  kpis: null,
+  audit: null,
+  ai: null,
+  subscription: null,
 };
 
 function Login({ onLogin }) {
@@ -77,286 +197,88 @@ function Login({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-surface">
       <form
         onSubmit={submit}
         className="bg-white p-8 rounded-xl shadow-md w-96 space-y-4"
+        aria-label="Sign in"
       >
-        <h1 className="text-2xl font-bold text-slate-800">InfraSure ERP</h1>
-        <p className="text-sm text-slate-500">Construction compliance platform</p>
+        <div>
+          <h1 className="text-2xl font-bold text-primary">InfraSure ERP</h1>
+          <p className="text-sm text-neutral">Construction compliance platform</p>
+        </div>
         <input
-          className="w-full border rounded px-3 py-2"
+          className={inputCls}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
+          aria-label="Email"
         />
         <input
           type="password"
-          className="w-full border rounded px-3 py-2"
+          className={inputCls}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
+          aria-label="Password"
         />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button className="w-full bg-slate-800 text-white rounded py-2 hover:bg-slate-700">
+        {error && (
+          <p className="text-danger text-sm" role="alert">
+            {error}
+          </p>
+        )}
+        <Button type="submit" style={{ width: "100%" }}>
           Sign in
-        </button>
+        </Button>
       </form>
     </div>
   );
 }
 
-function Card({ title, children, wide }) {
-  return (
-    <div
-      className={`bg-white rounded-xl shadow-sm p-5 ${wide ? "md:col-span-2" : ""}`}
-    >
-      <h3 className="font-semibold text-slate-700 mb-3">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-// A single KPI tile; colour reflects how healthy the percentage is.
-function Kpi({ label, value, suffix = "%" }) {
-  const n = typeof value === "number" ? value : 0;
-  const tone =
-    suffix !== "%"
-      ? "text-slate-800"
-      : n >= 85
-      ? "text-emerald-600"
-      : n >= 60
-      ? "text-amber-600"
-      : "text-red-600";
-  return (
-    <div className="bg-slate-50 rounded-lg p-4">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className={`text-2xl font-bold ${tone}`}>
-        {value}
-        {suffix}
-      </p>
-    </div>
-  );
-}
-
-const STATUS_TONE = {
-  FILED: "text-emerald-600",
-  APPROVED: "text-emerald-600",
-  COMPLETED: "text-emerald-600",
-  PENDING: "text-amber-600",
-  FAILED: "text-red-600",
-};
-function StatusPill({ value }) {
-  return (
-    <span className={`font-medium ${STATUS_TONE[value] || "text-slate-600"}`}>
-      {value}
-    </span>
-  );
-}
-
 function Dashboard({ session, onLogout }) {
   const { user, tenant } = session;
-  const tabs = NAV_BY_ROLE[user.role] || [];
-  const [tab, setTab] = useState(tabs[0] || "portfolio");
-  const [data, setData] = useState({
-    contracts: [],
-    expiring: [],
-    finance: [],
-    safety: [],
-    environment: [],
-    labour: [],
-    rera: [],
-    vendors: [],
-    disputes: [],
-    tiers: [],
-    subscription: null,
-    audit: null,
-    kpis: null,
-    ai: null,
-    integrations: [],
-  });
+  const tabs = NAV_BY_ROLE[user.role] || ["home"];
+  const [tab, setTab] = useState("home");
+  const [data, setData] = useState(EMPTY);
   const [err, setErr] = useState("");
   const [reload, setReload] = useState(0);
+  const [modal, setModal] = useState(null);
+  const [checkout, setCheckout] = useState(null);
+  const [integrationMsg, setIntegrationMsg] = useState("");
+
+  const datasets =
+    DATASETS_BY_ROLE[user.role] === "all"
+      ? Object.keys(QUERIES)
+      : DATASETS_BY_ROLE[user.role] || [];
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       setErr("");
-      const t = user.tenant_id;
-      const out = {
-        contracts: [],
-        expiring: [],
-        finance: [],
-        safety: [],
-        environment: [],
-        labour: [],
-        rera: [],
-        vendors: [],
-        disputes: [],
-        tiers: [],
-        subscription: null,
-        audit: null,
-        kpis: null,
-        ai: null,
-        integrations: [],
-      };
-      const safe = (p, fb) => p.then((d) => d).catch(() => fb);
-
-      try {
-        if (tabs.includes("contracts") || tabs.includes("portfolio")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getContracts(tenant_id:$t){contract_id title status expiry_date document_url version}}`,
-              { t }
-            ),
-            { getContracts: [] }
-          );
-          out.contracts = d.getContracts || [];
-          const e = await safe(
-            gql(
-              `query($t:ID!){getExpiringContracts(tenant_id:$t,withinDays:30){contract_id title status expiry_date}}`,
-              { t }
-            ),
-            { getExpiringContracts: [] }
-          );
-          out.expiring = e.getExpiringContracts || [];
-        }
-        if (tabs.includes("compliance") || tabs.includes("portfolio")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getComplianceKPIs(tenant_id:$t){gst_filing_compliance tds_filing_compliance ra_bill_approval_rate safety_audit_completion avg_ppe_compliance pf_esi_filing_rate rera_filing_rate overdue_payments audit_readiness_score}}`,
-              { t }
-            ),
-            { getComplianceKPIs: null }
-          );
-          out.kpis = d.getComplianceKPIs;
-        }
-        if (tabs.includes("finance")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getFinanceRecords(tenant_id:$t){finance_id invoice_number amount gst_filing_status tds_status ra_bill_status due_date paid_date}}`,
-              { t }
-            ),
-            { getFinanceRecords: [] }
-          );
-          out.finance = d.getFinanceRecords || [];
-        }
-        if (tabs.includes("safety")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getSafetyAudits(tenant_id:$t){safety_id site_name checklist_status ppe_compliance audit_date}}`,
-              { t }
-            ),
-            { getSafetyAudits: [] }
-          );
-          out.safety = d.getSafetyAudits || [];
-        }
-        if (tabs.includes("environment")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getEnvironmentalLogs(tenant_id:$t){env_log_id log_type reading unit notes recorded_at}}`,
-              { t }
-            ),
-            { getEnvironmentalLogs: [] }
-          );
-          out.environment = d.getEnvironmentalLogs || [];
-        }
-        if (tabs.includes("labour")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getLabourFilings(tenant_id:$t){labour_id filing_type period worker_count amount status filed_date}}`,
-              { t }
-            ),
-            { getLabourFilings: [] }
-          );
-          out.labour = d.getLabourFilings || [];
-        }
-        if (tabs.includes("rera")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getReraFilings(tenant_id:$t){filing_id project_name filing_type status due_date filed_date}}`,
-              { t }
-            ),
-            { getReraFilings: [] }
-          );
-          out.rera = d.getReraFilings || [];
-        }
-        if (tabs.includes("vendors")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getVendors(tenant_id:$t){vendor_id name gst_number certification_name certification_expiry status}}`,
-              { t }
-            ),
-            { getVendors: [] }
-          );
-          out.vendors = d.getVendors || [];
-        }
-        if (tabs.includes("disputes")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getDisputes(tenant_id:$t){dispute_id title dispute_type counterparty amount status escalation_level}}`,
-              { t }
-            ),
-            { getDisputes: [] }
-          );
-          out.disputes = d.getDisputes || [];
-        }
-        if (tabs.includes("audit") || tabs.includes("portfolio")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getAuditReadiness(tenant_id:$t){documents_verified documents_total pending_approvals open_disputes vendor_compliance_rate audit_readiness_score}}`,
-              { t }
-            ),
-            { getAuditReadiness: null }
-          );
-          out.audit = d.getAuditReadiness;
-        }
-        if (tabs.includes("billing")) {
-          const sub = await safe(
-            gql(
-              `query($t:ID!){getSubscription(tenant_id:$t){plan_type billing_cycle status current_period_end}}`,
-              { t }
-            ),
-            { getSubscription: null }
-          );
-          out.subscription = sub.getSubscription;
-          const tiers = await safe(
-            gql(`query{getBillingTiers{code name price_inr features}}`),
-            { getBillingTiers: [] }
-          );
-          out.tiers = tiers.getBillingTiers || [];
-        }
-        if (tabs.includes("ai") || tabs.includes("portfolio")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getAIInsights(tenant_id:$t){available predictive_score risk_level weak_factors anomalies{finance_id type severity detail}}}`,
-              { t }
-            ),
-            { getAIInsights: null }
-          );
-          out.ai = d.getAIInsights;
-        }
-        if (tabs.includes("integrations")) {
-          const d = await safe(
-            gql(
-              `query($t:ID!){getIntegrationStatus(tenant_id:$t){integration configured driver}}`,
-              { t }
-            ),
-            { getIntegrationStatus: [] }
-          );
-          out.integrations = d.getIntegrationStatus || [];
-        }
-        setData(out);
-      } catch (e) {
-        setErr(e.message);
-      }
+      const out = { ...EMPTY };
+      await Promise.all(
+        datasets.map(async (key) => {
+          try {
+            const res = await gql(QUERIES[key], { t: user.tenant_id });
+            out[key] = res[FIELD_OF[key]] ?? EMPTY[key];
+          } catch {
+            out[key] = EMPTY[key]; // unauthorized/offline → keep fallback
+          }
+        })
+      );
+      if (!cancelled) setData(out);
     }
     load();
-  }, [tab, user.tenant_id, reload]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user.tenant_id, user.role, reload]);
 
+  const refresh = () => setReload((n) => n + 1);
+  const alerts = useMemo(() => buildAlerts(data), [data]);
   const canUpload = ["ADMIN", "PROJECT_MANAGER", "COMPLIANCE_OFFICER"].includes(
     user.role
   );
-  const refresh = () => setReload((n) => n + 1);
 
   async function handleUpload(contractId, file) {
     if (!file) return;
@@ -369,7 +291,6 @@ function Dashboard({ session, onLogout }) {
     }
   }
 
-  // Fire a mutation then refresh the active view.
   async function mutate(query, variables) {
     setErr("");
     try {
@@ -379,8 +300,6 @@ function Dashboard({ session, onLogout }) {
       setErr(e.message);
     }
   }
-
-  const [checkout, setCheckout] = useState(null);
 
   async function startCheckout(plan) {
     setErr("");
@@ -396,9 +315,6 @@ function Dashboard({ session, onLogout }) {
     }
   }
 
-  const [integrationMsg, setIntegrationMsg] = useState("");
-
-  // Runs an integration mutation (no args beyond tenant) and shows the result line.
   async function runIntegration(mutationField) {
     setErr("");
     setIntegrationMsg("");
@@ -417,727 +333,122 @@ function Dashboard({ session, onLogout }) {
     }
   }
 
+  const quickActions = {
+    ENGINEER: [
+      { label: "New DPR", onClick: () => setModal("dpr") },
+      { label: "Log Safety Audit", onClick: () => setModal("safety") },
+    ],
+    ACCOUNTANT: [{ label: "New Finance Record", onClick: () => setModal("finance") }],
+    PROJECT_MANAGER: [{ label: "New Contract", onClick: () => setModal("contract") }],
+    ADMIN: [
+      { label: "New Contract", onClick: () => setModal("contract") },
+      { label: "New Finance Record", onClick: () => setModal("finance") },
+    ],
+    COMPLIANCE_OFFICER: [],
+  }[user.role];
+
+  const home =
+    user.role === "ENGINEER" ? (
+      <EngineerHome data={data} />
+    ) : user.role === "ACCOUNTANT" ? (
+      <AccountantHome data={data} mutate={mutate} />
+    ) : user.role === "COMPLIANCE_OFFICER" ? (
+      <OfficerHome data={data} />
+    ) : (
+      <PMHome
+        data={data}
+        alerts={alerts}
+        mutate={mutate}
+        canApprove={["ADMIN", "PROJECT_MANAGER"].includes(user.role)}
+      />
+    );
+
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="bg-slate-800 text-white px-6 py-4 flex justify-between items-center">
-        <div>
-          <span className="font-bold">InfraSure ERP</span>
-          <span className="ml-3 text-slate-300 text-sm">{tenant.company_name}</span>
-        </div>
-        <div className="flex items-center gap-4 text-sm">
-          <span>
-            {user.email} · <span className="text-emerald-300">{user.role}</span>
-          </span>
-          <button onClick={onLogout} className="underline">
-            Logout
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-surface flex">
+      <Sidebar tabs={tabs} tab={tab} setTab={setTab} quickActions={quickActions} />
 
-      <nav className="bg-white border-b px-6 flex gap-2 flex-wrap">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-3 text-sm capitalize border-b-2 ${
-              tab === t
-                ? "border-slate-800 text-slate-800 font-medium"
-                : "border-transparent text-slate-500"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </nav>
+      <div className="flex-1 min-w-0">
+        <TopBar user={user} tenant={tenant} alerts={alerts} onLogout={onLogout} />
 
-      <main className="p-6 grid gap-5 md:grid-cols-2">
-        {err && <p className="text-red-600 col-span-2">{err}</p>}
-
-        {tab === "portfolio" && (
-          <>
-            <Card title="Active Contracts">
-              <p className="text-4xl font-bold text-slate-800">
-                {data.contracts.length}
-              </p>
-            </Card>
-            <Card title="Audit Readiness">
-              <p className="text-4xl font-bold text-emerald-600">
-                {data.audit
-                  ? `${data.audit.audit_readiness_score}%`
-                  : data.kpis
-                  ? `${data.kpis.audit_readiness_score}%`
-                  : "—"}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                {data.audit
-                  ? `${data.audit.open_disputes} open disputes · ${data.audit.pending_approvals} pending approvals`
-                  : "Composite of all compliance KPIs"}
-              </p>
-            </Card>
-            <Card title="Expiry Alerts (next 30 days)">
-              {data.expiring.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  No contracts expiring soon. ✅
-                </p>
-              ) : (
-                <ul className="text-sm space-y-1">
-                  {data.expiring.map((c) => {
-                    const d = daysUntil(c.expiry_date);
-                    return (
-                      <li key={c.contract_id} className="flex justify-between">
-                        <span className="text-slate-700">{c.title}</span>
-                        <span
-                          className={
-                            d < 0
-                              ? "text-red-600 font-medium"
-                              : "text-amber-600 font-medium"
-                          }
-                        >
-                          {d < 0 ? `expired ${-d}d ago` : `in ${d}d`}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
-          </>
-        )}
-
-        {tab === "compliance" && (
-          <Card title="Compliance KPIs" wide>
-            {!data.kpis ? (
-              <p className="text-sm text-slate-500">No KPI data.</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Kpi label="GST filing" value={data.kpis.gst_filing_compliance} />
-                <Kpi label="TDS filing" value={data.kpis.tds_filing_compliance} />
-                <Kpi label="RA bill approval" value={data.kpis.ra_bill_approval_rate} />
-                <Kpi label="Safety audits done" value={data.kpis.safety_audit_completion} />
-                <Kpi label="Avg PPE compliance" value={data.kpis.avg_ppe_compliance} />
-                <Kpi label="PF/ESI filing" value={data.kpis.pf_esi_filing_rate} />
-                <Kpi label="RERA filing" value={data.kpis.rera_filing_rate} />
-                <Kpi label="Overdue payments" value={data.kpis.overdue_payments} suffix="" />
-                <Kpi label="Audit readiness" value={data.kpis.audit_readiness_score} />
-              </div>
-            )}
-          </Card>
-        )}
-
-        {tab === "contracts" && (
-          <Card title="Contracts" wide>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Title</th>
-                  <th>Status</th>
-                  <th>Expiry</th>
-                  <th>Document</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.contracts.map((c) => {
-                  const d = daysUntil(c.expiry_date);
-                  const soon = d <= 30;
-                  return (
-                    <tr key={c.contract_id} className="border-t align-middle">
-                      <td className="py-2">{c.title}</td>
-                      <td>{c.status}</td>
-                      <td className={soon ? "text-amber-600 font-medium" : ""}>
-                        {(c.expiry_date || "").slice(0, 10)}
-                        {soon && (
-                          <span className="ml-1 text-xs">
-                            {d < 0 ? "(expired)" : `(${d}d)`}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {c.document_url ? (
-                          <a
-                            href={`${API_ORIGIN}${c.document_url}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 underline"
-                          >
-                            view
-                          </a>
-                        ) : canUpload ? (
-                          <label className="text-slate-500 cursor-pointer underline">
-                            upload
-                            <input
-                              type="file"
-                              className="hidden"
-                              onChange={(e) =>
-                                handleUpload(c.contract_id, e.target.files[0])
-                              }
-                            />
-                          </label>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {tab === "finance" && (
-          <Card title="Financial Compliance" wide>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Invoice</th>
-                  <th>Amount</th>
-                  <th>GST</th>
-                  <th>TDS</th>
-                  <th>RA Bill</th>
-                  <th>Payment</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.finance.map((f) => {
-                  const overdue =
-                    !f.paid_date && daysUntil(f.due_date) < 0;
-                  return (
-                    <tr key={f.finance_id} className="border-t">
-                      <td className="py-2">{f.invoice_number || "—"}</td>
-                      <td>₹{f.amount.toLocaleString("en-IN")}</td>
-                      <td><StatusPill value={f.gst_filing_status} /></td>
-                      <td><StatusPill value={f.tds_status} /></td>
-                      <td><StatusPill value={f.ra_bill_status} /></td>
-                      <td>
-                        {f.paid_date ? (
-                          <span className="text-emerald-600">paid</span>
-                        ) : overdue ? (
-                          <span className="text-red-600 font-medium">overdue</span>
-                        ) : (
-                          <span className="text-amber-600">due</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {tab === "safety" && (
-          <Card title="Safety Audits" wide>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Site</th>
-                  <th>Audit date</th>
-                  <th>Status</th>
-                  <th>PPE %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.safety.map((s) => (
-                  <tr key={s.safety_id} className="border-t">
-                    <td className="py-2">{s.site_name || "—"}</td>
-                    <td>{(s.audit_date || "").slice(0, 10)}</td>
-                    <td><StatusPill value={s.checklist_status} /></td>
-                    <td
-                      className={
-                        s.ppe_compliance >= 85
-                          ? "text-emerald-600"
-                          : s.ppe_compliance >= 60
-                          ? "text-amber-600"
-                          : "text-red-600"
-                      }
-                    >
-                      {s.ppe_compliance}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {tab === "environment" && (
-          <Card title="Environmental Logs (pollution / waste)" wide>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Type</th>
-                  <th>Reading</th>
-                  <th>Recorded</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.environment.map((e) => (
-                  <tr key={e.env_log_id} className="border-t">
-                    <td className="py-2">{e.log_type}</td>
-                    <td>
-                      {e.reading} {e.unit}
-                    </td>
-                    <td>{(e.recorded_at || "").slice(0, 10)}</td>
-                    <td className="text-slate-500">{e.notes || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {tab === "labour" && (
-          <Card title="Labour Compliance (PF / ESI / Wage)" wide>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Type</th>
-                  <th>Period</th>
-                  <th>Workers</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  {canUpload && <th></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {data.labour.map((l) => (
-                  <tr key={l.labour_id} className="border-t">
-                    <td className="py-2">{l.filing_type}</td>
-                    <td>{l.period}</td>
-                    <td>{l.worker_count}</td>
-                    <td>₹{l.amount.toLocaleString("en-IN")}</td>
-                    <td><StatusPill value={l.status} /></td>
-                    {canUpload && (
-                      <td>
-                        {l.status !== "FILED" && (
-                          <button
-                            onClick={() =>
-                              mutate(
-                                `mutation($t:ID!,$id:ID!){updateLabourFilingStatus(tenant_id:$t,labour_id:$id,status:"FILED"){labour_id}}`,
-                                { id: l.labour_id }
-                              )
-                            }
-                            className="text-blue-600 underline text-xs"
-                          >
-                            mark filed
-                          </button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {tab === "rera" && (
-          <Card title="RERA Filings" wide>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Project</th>
-                  <th>Type</th>
-                  <th>Due</th>
-                  <th>Status</th>
-                  {canUpload && <th></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {data.rera.map((r) => {
-                  const overdue =
-                    r.status === "PENDING" && daysUntil(r.due_date) < 0;
-                  return (
-                    <tr key={r.filing_id} className="border-t">
-                      <td className="py-2">{r.project_name}</td>
-                      <td>{r.filing_type}</td>
-                      <td className={overdue ? "text-red-600 font-medium" : ""}>
-                        {(r.due_date || "").slice(0, 10)}
-                      </td>
-                      <td><StatusPill value={r.status} /></td>
-                      {canUpload && (
-                        <td>
-                          {r.status === "PENDING" && (
-                            <button
-                              onClick={() =>
-                                mutate(
-                                  `mutation($t:ID!,$id:ID!){updateReraFilingStatus(tenant_id:$t,filing_id:$id,status:"FILED"){filing_id}}`,
-                                  { id: r.filing_id }
-                                )
-                              }
-                              className="text-blue-600 underline text-xs"
-                            >
-                              mark filed
-                            </button>
-                          )}
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {tab === "audit" && (
-          <Card title="Audit Readiness" wide>
-            {!data.audit ? (
-              <p className="text-sm text-slate-500">No audit data.</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Kpi
-                  label="Audit readiness"
-                  value={data.audit.audit_readiness_score}
-                />
-                <Kpi
-                  label="Vendor compliance"
-                  value={data.audit.vendor_compliance_rate}
-                />
-                <div className="bg-slate-50 rounded-lg p-4">
-                  <p className="text-xs text-slate-500">Documents verified</p>
-                  <p className="text-2xl font-bold text-slate-800">
-                    {data.audit.documents_verified}/{data.audit.documents_total}
-                  </p>
-                </div>
-                <Kpi
-                  label="Pending approvals"
-                  value={data.audit.pending_approvals}
-                  suffix=""
-                />
-                <Kpi
-                  label="Open disputes"
-                  value={data.audit.open_disputes}
-                  suffix=""
-                />
-              </div>
-            )}
-          </Card>
-        )}
-
-        {tab === "vendors" && (
-          <Card title="Vendor / Subcontractor Registry" wide>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Vendor</th>
-                  <th>Certification</th>
-                  <th>Cert. expiry</th>
-                  <th>Status</th>
-                  {canUpload && <th></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {data.vendors.map((v) => {
-                  const d = daysUntil(v.certification_expiry);
-                  const soon = v.certification_expiry && d <= 30;
-                  return (
-                    <tr key={v.vendor_id} className="border-t">
-                      <td className="py-2">{v.name}</td>
-                      <td>{v.certification_name || "—"}</td>
-                      <td className={soon ? "text-amber-600 font-medium" : ""}>
-                        {v.certification_expiry
-                          ? `${v.certification_expiry.slice(0, 10)}${
-                              soon ? (d < 0 ? " (expired)" : ` (${d}d)`) : ""
-                            }`
-                          : "—"}
-                      </td>
-                      <td><StatusPill value={v.status} /></td>
-                      {canUpload && (
-                        <td>
-                          <button
-                            onClick={() =>
-                              mutate(
-                                `mutation($t:ID!,$id:ID!,$s:String!){updateVendorStatus(tenant_id:$t,vendor_id:$id,status:$s){vendor_id}}`,
-                                {
-                                  id: v.vendor_id,
-                                  s: v.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
-                                }
-                              )
-                            }
-                            className="text-blue-600 underline text-xs"
-                          >
-                            {v.status === "ACTIVE" ? "suspend" : "reactivate"}
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {tab === "disputes" && (
-          <Card title="Risk & Dispute Register" wide>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Title</th>
-                  <th>Type</th>
-                  <th>Counterparty</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Esc.</th>
-                  {canUpload && <th></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {data.disputes.map((d) => (
-                  <tr key={d.dispute_id} className="border-t">
-                    <td className="py-2">{d.title}</td>
-                    <td>{d.dispute_type}</td>
-                    <td>{d.counterparty || "—"}</td>
-                    <td>₹{d.amount.toLocaleString("en-IN")}</td>
-                    <td><StatusPill value={d.status} /></td>
-                    <td>{d.escalation_level}</td>
-                    {canUpload && (
-                      <td className="space-x-2">
-                        {d.status !== "RESOLVED" && (
-                          <>
-                            <button
-                              onClick={() =>
-                                mutate(
-                                  `mutation($t:ID!,$id:ID!){escalateDispute(tenant_id:$t,dispute_id:$id){dispute_id}}`,
-                                  { id: d.dispute_id }
-                                )
-                              }
-                              className="text-amber-600 underline text-xs"
-                            >
-                              escalate
-                            </button>
-                            <button
-                              onClick={() =>
-                                mutate(
-                                  `mutation($t:ID!,$id:ID!){updateDisputeStatus(tenant_id:$t,dispute_id:$id,status:"RESOLVED"){dispute_id}}`,
-                                  { id: d.dispute_id }
-                                )
-                              }
-                              className="text-emerald-600 underline text-xs"
-                            >
-                              resolve
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )}
-
-        {tab === "billing" && (
-          <Card title="Billing & Subscription" wide>
-            <p className="text-sm text-slate-600 mb-4">
-              Current plan:{" "}
-              <span className="font-semibold text-slate-800">
-                {data.subscription?.plan_type || "—"}
-              </span>{" "}
-              · status {data.subscription?.status || "—"}
+        <main className="p-6 grid gap-5 md:grid-cols-2" aria-live="polite">
+          {err && (
+            <p className="text-danger col-span-2" role="alert">
+              {err}
             </p>
-            {checkout && (
-              <p className="text-sm mb-4 bg-emerald-50 text-emerald-700 rounded p-3">
-                Checkout session created ({checkout.driver}):{" "}
-                <a
-                  href={checkout.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline break-all"
-                >
-                  {checkout.url}
-                </a>
-              </p>
-            )}
-            <div className="grid md:grid-cols-3 gap-4">
-              {data.tiers.map((tier) => {
-                const current = data.subscription?.plan_type === tier.code;
-                return (
-                  <div
-                    key={tier.code}
-                    className={`rounded-lg border p-4 ${
-                      current ? "border-slate-800" : "border-slate-200"
-                    }`}
-                  >
-                    <h4 className="font-semibold text-slate-800">{tier.name}</h4>
-                    <p className="text-2xl font-bold text-slate-800 my-1">
-                      ₹{tier.price_inr.toLocaleString("en-IN")}
-                      <span className="text-xs font-normal text-slate-500">/mo</span>
-                    </p>
-                    <ul className="text-xs text-slate-500 space-y-1 mb-3">
-                      {tier.features.map((f) => (
-                        <li key={f}>• {f}</li>
-                      ))}
-                    </ul>
-                    {current ? (
-                      <span className="text-xs text-emerald-600 font-medium">
-                        Current plan
-                      </span>
-                    ) : (
-                      <div className="space-x-3">
-                        <button
-                          onClick={() =>
-                            mutate(
-                              `mutation($t:ID!,$p:String!){changeSubscriptionPlan(tenant_id:$t,plan_type:$p){plan_type}}`,
-                              { p: tier.code }
-                            )
-                          }
-                          className="text-blue-600 underline text-xs"
-                        >
-                          switch
-                        </button>
-                        <button
-                          onClick={() => startCheckout(tier.code)}
-                          className="text-slate-600 underline text-xs"
-                        >
-                          checkout
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        )}
+          )}
 
-        {tab === "ai" && (
-          <Card title="AI Compliance Insights" wide>
-            {!data.ai ? (
-              <p className="text-sm text-slate-500">No insights.</p>
-            ) : !data.ai.available ? (
-              <p className="text-sm text-amber-600">
-                AI engine is offline — insights unavailable. Start the
-                <code className="mx-1 bg-slate-100 px-1 rounded">ai-engine</code>
-                service to enable predictive scoring and anomaly detection.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <Kpi
-                    label="Predictive score"
-                    value={data.ai.predictive_score ?? 0}
-                  />
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <p className="text-xs text-slate-500">Risk level</p>
-                    <p
-                      className={`text-2xl font-bold ${
-                        data.ai.risk_level === "LOW"
-                          ? "text-emerald-600"
-                          : data.ai.risk_level === "MEDIUM"
-                          ? "text-amber-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {data.ai.risk_level}
-                    </p>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <p className="text-xs text-slate-500">Anomalies</p>
-                    <p className="text-2xl font-bold text-slate-800">
-                      {data.ai.anomalies.length}
-                    </p>
-                  </div>
-                </div>
-                {data.ai.weak_factors.length > 0 && (
-                  <p className="text-sm text-slate-600">
-                    Weak factors: {data.ai.weak_factors.join(", ")}
-                  </p>
-                )}
-                {data.ai.anomalies.length > 0 && (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-slate-400">
-                        <th className="py-1">Type</th>
-                        <th>Severity</th>
-                        <th>Detail</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.ai.anomalies.map((a, i) => (
-                        <tr key={i} className="border-t">
-                          <td className="py-2">{a.type}</td>
-                          <td
-                            className={
-                              a.severity === "HIGH"
-                                ? "text-red-600 font-medium"
-                                : "text-amber-600"
-                            }
-                          >
-                            {a.severity}
-                          </td>
-                          <td className="text-slate-600">{a.detail}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-          </Card>
-        )}
+          {tab === "home" && home}
+          {tab === "compliance" && <ComplianceModule data={data} />}
+          {tab === "audit" && <AuditModule data={data} />}
+          {tab === "ai" && <AIModule data={data} />}
+          {tab === "contracts" && (
+            <ContractsModule
+              data={data}
+              canUpload={canUpload}
+              handleUpload={handleUpload}
+            />
+          )}
+          {tab === "finance" && <AccountantHome data={data} mutate={mutate} />}
+          {tab === "safety" && <SafetyModule data={data} />}
+          {tab === "environment" && <EnvironmentModule data={data} />}
+          {tab === "labour" && (
+            <LabourModule
+              data={data}
+              canAct={["ADMIN", "ACCOUNTANT", "COMPLIANCE_OFFICER"].includes(user.role)}
+              mutate={mutate}
+            />
+          )}
+          {tab === "rera" && (
+            <ReraModule data={data} canAct={canUpload} mutate={mutate} />
+          )}
+          {tab === "vendors" && (
+            <VendorsModule data={data} canAct={canUpload} mutate={mutate} />
+          )}
+          {tab === "disputes" && (
+            <DisputesModule data={data} canAct={canUpload} mutate={mutate} />
+          )}
+          {tab === "billing" && (
+            <BillingModule
+              data={data}
+              checkout={checkout}
+              startCheckout={startCheckout}
+              mutate={mutate}
+            />
+          )}
+          {tab === "integrations" && (
+            <IntegrationsModule
+              data={data}
+              integrationMsg={integrationMsg}
+              runIntegration={runIntegration}
+            />
+          )}
+        </main>
+      </div>
 
-        {tab === "integrations" && (
-          <Card title="External Integrations" wide>
-            {integrationMsg && (
-              <p className="text-sm mb-4 bg-slate-100 text-slate-700 rounded p-3">
-                {integrationMsg}
-              </p>
-            )}
-            <table className="w-full text-sm mb-4">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-1">Integration</th>
-                  <th>Driver</th>
-                  <th>Configured</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.integrations.map((i) => (
-                  <tr key={i.integration} className="border-t">
-                    <td className="py-2">{i.integration}</td>
-                    <td>{i.driver}</td>
-                    <td>
-                      {i.configured ? (
-                        <span className="text-emerald-600">live</span>
-                      ) : (
-                        <span className="text-amber-600">stub</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => runIntegration("syncTallyLedger")}
-                className="bg-slate-800 text-white rounded px-3 py-2 text-sm hover:bg-slate-700"
-              >
-                Sync Tally/SAP
-              </button>
-              <button
-                onClick={() => runIntegration("syncReraUpdates")}
-                className="bg-slate-800 text-white rounded px-3 py-2 text-sm hover:bg-slate-700"
-              >
-                Sync RERA updates
-              </button>
-              <button
-                onClick={() => runIntegration("importBimModel")}
-                className="bg-slate-800 text-white rounded px-3 py-2 text-sm hover:bg-slate-700"
-              >
-                Import BIM model
-              </button>
-            </div>
-            <p className="text-xs text-slate-400 mt-3">
-              GST e-filing and Aadhaar e-Sign run per-record from the Finance and
-              Contracts screens.
-            </p>
-          </Card>
-        )}
-      </main>
+      <NewDPRModal
+        open={modal === "dpr"}
+        onClose={() => setModal(null)}
+        tenantId={user.tenant_id}
+        onDone={refresh}
+      />
+      <SafetyAuditModal
+        open={modal === "safety"}
+        onClose={() => setModal(null)}
+        tenantId={user.tenant_id}
+        onDone={refresh}
+      />
+      <FinanceModal
+        open={modal === "finance"}
+        onClose={() => setModal(null)}
+        tenantId={user.tenant_id}
+        onDone={refresh}
+      />
+      <ContractModal
+        open={modal === "contract"}
+        onClose={() => setModal(null)}
+        tenantId={user.tenant_id}
+        onDone={refresh}
+      />
     </div>
   );
 }
