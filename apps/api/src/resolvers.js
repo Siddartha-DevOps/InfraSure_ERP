@@ -351,6 +351,23 @@ export const resolvers = {
       authorize("getIntegrationStatus", args, user);
       return integrationStatus();
     },
+
+    // ---- Dashboards ----
+    getDPRs: async (_p, args, { user }) => {
+      authorize("getDPRs", args, user);
+      return prisma.dpr.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { created_at: "desc" },
+      });
+    },
+
+    getWorkflowSteps: async (_p, args, { user }) => {
+      authorize("getWorkflowSteps", args, user);
+      return prisma.workflowStep.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { created_at: "desc" },
+      });
+    },
   },
 
   Mutation: {

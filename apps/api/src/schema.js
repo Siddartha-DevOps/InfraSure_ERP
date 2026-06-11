@@ -244,6 +244,10 @@ export const typeDefs = /* GraphQL */ `
     # --- Phase 4 ---
     getAIInsights(tenant_id: ID!): AIInsights!
     getIntegrationStatus(tenant_id: ID!): [IntegrationStatus!]!
+
+    # --- Dashboards ---
+    getDPRs(tenant_id: ID!): [Dpr!]!
+    getWorkflowSteps(tenant_id: ID!): [WorkflowStep!]!
   }
 
   type Mutation {
