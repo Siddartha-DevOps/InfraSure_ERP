@@ -159,6 +159,16 @@ export const typeDefs = /* GraphQL */ `
     anomalies: [AIAnomaly!]!
   }
 
+  # Geo-tagged project site for the compliance map.
+  type Site {
+    site_id: ID!
+    tenant_id: ID!
+    name: String!
+    latitude: Float!
+    longitude: Float!
+    status: String!
+  }
+
   # --- Phase 4: External integrations ---
   type IntegrationStatus {
     integration: String!
@@ -248,6 +258,7 @@ export const typeDefs = /* GraphQL */ `
     # --- Dashboards ---
     getDPRs(tenant_id: ID!): [Dpr!]!
     getWorkflowSteps(tenant_id: ID!): [WorkflowStep!]!
+    getSites(tenant_id: ID!): [Site!]!
   }
 
   type Mutation {
@@ -342,6 +353,16 @@ export const typeDefs = /* GraphQL */ `
     # --- Phase 3: Billing ---
     changeSubscriptionPlan(tenant_id: ID!, plan_type: String!): Subscription!
     createBillingCheckout(tenant_id: ID!, plan_type: String!): CheckoutSession!
+
+    # --- Sites (geo map) ---
+    createSite(
+      tenant_id: ID!
+      name: String!
+      latitude: Float!
+      longitude: Float!
+      status: String
+    ): Site!
+    updateSiteStatus(tenant_id: ID!, site_id: ID!, status: String!): Site!
 
     # --- Phase 4: External integrations ---
     syncTallyLedger(tenant_id: ID!): IntegrationResult!

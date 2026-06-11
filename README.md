@@ -113,9 +113,16 @@ Tokens live in `apps/web/tailwind.config.js`; components in `apps/web/src/ui.jsx
   actions, finance KPIs, charts) · Compliance Officer (audit readiness, env/labour logs,
   expiring certificates) · Project Manager/Admin (portfolio, trends, consolidated alerts,
   approvals).
-- **Pending from the design spec:** multilingual EN/HI/TE (i18n) and a geo project map
-  (needs geo-tagged project data from mobile DPRs); full WCAG audit beyond the included
-  aria/focus/contrast basics.
+- **Internationalization (EN / हिन्दी / తెలుగు):** `src/i18n.jsx` provides a
+  `useI18n()` hook + language switcher (top bar); covers the app chrome (nav, login,
+  alerts, quick actions, map). `t()` falls back to English then the key, so partial
+  coverage degrades gracefully — extend the dictionaries to localize more strings.
+- **Geo project map:** `src/ProjectMap.jsx` (Leaflet + OpenStreetMap) plots `Site`
+  records as status-colored markers (🟢 compliant / 🟡 pending / 🔴 non-compliant) on the
+  Project Map tab and the PM/Admin home. Backed by the `Site` model + `getSites` /
+  `createSite` / `updateSiteStatus`.
+- **Still pending from the design spec:** a full WCAG 2.1 AA audit beyond the included
+  aria/focus/contrast basics, and localizing the remaining table/body strings.
 
 ## Testing (resolver / security suite)
 

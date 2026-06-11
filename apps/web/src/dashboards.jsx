@@ -12,6 +12,7 @@ import {
   SiteBoard,
   Button,
 } from "./ui.jsx";
+import { ProjectMap } from "./ProjectMap.jsx";
 
 const day = (iso) => (iso || "").slice(0, 10);
 const pct = (n, total) => (total === 0 ? 100 : Math.round((n / total) * 100));
@@ -421,6 +422,8 @@ export function PMHome({ data, alerts, mutate, canApprove }) {
       <Card title="Critical alerts" wide>
         <AlertsFeed alerts={alerts} compact />
       </Card>
+
+      <ProjectMap sites={data.sites} />
 
       <Card title="DPR activity (last 7 days)">
         <BarChart data={dprTrend(data.dprs)} />

@@ -368,6 +368,14 @@ export const resolvers = {
         orderBy: { created_at: "desc" },
       });
     },
+
+    getSites: async (_p, args, { user }) => {
+      authorize("getSites", args, user);
+      return prisma.site.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { created_at: "desc" },
+      });
+    },
   },
 
   Mutation: {
@@ -916,6 +924,46 @@ export const resolvers = {
         metadata: { plan_type: args.plan_type, driver: session.driver },
       });
       return session;
+    },
+
+    // ---- Sites (geo map) ----
+    createSite: async (_p, args, { user }) => {
+      authorize("createSite", args, user);
+      const site = await prisma.site.create({
+        data: {
+          tenant_id: args.tenant_id,
+          name: args.name,
+          latitude: args.latitude,
+          longitude: args.longitude,
+          status: args.status ?? "PENDING",
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createSite",
+        metadata: { site_id: site.site_id, name: site.name },
+      });
+      return site;
+    },
+
+    updateSiteStatus: async (_p, args, { user }) => {
+      authorize("updateSiteStatus", args, user);
+      const found = await prisma.site.findFirst({
+        where: { site_id: args.site_id, tenant_id: args.tenant_id },
+      });
+      if (!found) throw notFound("Site");
+      const site = await prisma.site.update({
+        where: { site_id: args.site_id },
+        data: { status: args.status },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "updateSiteStatus",
+        metadata: { site_id: args.site_id, status: args.status },
+      });
+      return site;
     },
 
     // ---- Phase 4: External integrations (stub-by-default, audit-logged) ----
