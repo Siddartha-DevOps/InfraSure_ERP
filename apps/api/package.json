@@ -15,7 +15,7 @@
     "test:integration": "node --test test/resolvers.integration.test.js"
   },
   "dependencies": {
-    "@apollo/server": "^4.11.0",
+    "@apollo/server": "^5.5.1",
     "@infrasure/db": "*",
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
