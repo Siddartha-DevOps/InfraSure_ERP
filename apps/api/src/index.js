@@ -5,7 +5,9 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import multer from "multer";
 import { ApolloServer } from "@apollo/server";
-import { expressMiddleware } from "@apollo/server/express4";
+// Apollo Server v5 moved the Express 4 middleware out of @apollo/server into
+// its own integration package.
+import { expressMiddleware } from "@as-integrations/express4";
 import prisma from "@infrasure/db";
 import { typeDefs } from "./schema.js";
 import { resolvers } from "./resolvers.js";
