@@ -68,6 +68,7 @@ function LoginScreen({ onLogin }) {
 
 function DPRScreen({ session, onLogout }) {
   const [note, setNote] = useState("");
+  const [siteName, setSiteName] = useState("");
   const [coords, setCoords] = useState(null);
   const [photoUri, setPhotoUri] = useState(null);
   const [queueCount, setQueueCount] = useState(0);
@@ -104,6 +105,7 @@ function DPRScreen({ session, onLogout }) {
     }
     const entry = {
       note,
+      site_name: siteName.trim() || undefined, // names the auto-created map site
       location: coords,
       photo_uri: photoUri,
       reported_by: session.user.email,
@@ -137,6 +139,14 @@ function DPRScreen({ session, onLogout }) {
           <Text style={styles.link}>Logout</Text>
         </TouchableOpacity>
       </View>
+
+      <Text style={styles.label}>Site name</Text>
+      <TextInput
+        style={styles.input}
+        value={siteName}
+        onChangeText={setSiteName}
+        placeholder="Site A — Pier Casting"
+      />
 
       <Text style={styles.label}>Notes</Text>
       <TextInput

@@ -1,28 +1,30 @@
 // Module screens (per-domain views), shared across roles via the sidebar.
 import { Card, Kpi, StatusPill, Button } from "./ui.jsx";
 import { API_ORIGIN } from "./api.js";
+import { useI18n } from "./i18n.jsx";
 
 const day = (iso) => (iso || "").slice(0, 10);
 const daysUntil = (iso) =>
   iso ? Math.ceil((new Date(iso) - new Date()) / 86400000) : Infinity;
 
 export function ComplianceModule({ data }) {
+  const { t } = useI18n();
   const k = data.kpis;
   return (
-    <Card title="Compliance KPIs" wide>
+    <Card title={t("card.complianceKpis")} wide>
       {!k ? (
-        <p className="text-sm text-neutral">No KPI data.</p>
+        <p className="text-sm text-neutral">{t("empty.noKpi")}</p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Kpi label="GST filing" value={k.gst_filing_compliance} />
-          <Kpi label="TDS filing" value={k.tds_filing_compliance} />
-          <Kpi label="RA bill approval" value={k.ra_bill_approval_rate} />
-          <Kpi label="Safety audits done" value={k.safety_audit_completion} />
-          <Kpi label="Avg PPE compliance" value={k.avg_ppe_compliance} />
-          <Kpi label="PF/ESI filing" value={k.pf_esi_filing_rate} />
-          <Kpi label="RERA filing" value={k.rera_filing_rate} />
-          <Kpi label="Overdue payments" value={k.overdue_payments} suffix="" invert />
-          <Kpi label="Audit readiness" value={k.audit_readiness_score} />
+          <Kpi label={t("kpi.gst")} value={k.gst_filing_compliance} />
+          <Kpi label={t("kpi.tds")} value={k.tds_filing_compliance} />
+          <Kpi label={t("kpi.ra")} value={k.ra_bill_approval_rate} />
+          <Kpi label={t("kpi.safetyAuditsDone")} value={k.safety_audit_completion} />
+          <Kpi label={t("kpi.avgPpe")} value={k.avg_ppe_compliance} />
+          <Kpi label={t("kpi.pfEsi")} value={k.pf_esi_filing_rate} />
+          <Kpi label={t("kpi.rera")} value={k.rera_filing_rate} />
+          <Kpi label={t("kpi.overdue")} value={k.overdue_payments} suffix="" invert />
+          <Kpi label={t("kpi.readiness")} value={k.audit_readiness_score} />
         </div>
       )}
     </Card>
@@ -30,23 +32,24 @@ export function ComplianceModule({ data }) {
 }
 
 export function AuditModule({ data }) {
+  const { t } = useI18n();
   const a = data.audit;
   return (
-    <Card title="Audit Readiness" wide>
+    <Card title={t("card.auditReadiness")} wide>
       {!a ? (
-        <p className="text-sm text-neutral">No audit data.</p>
+        <p className="text-sm text-neutral">{t("empty.noAudit")}</p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Kpi label="Audit readiness" value={a.audit_readiness_score} />
-          <Kpi label="Vendor compliance" value={a.vendor_compliance_rate} />
+          <Kpi label={t("kpi.readiness")} value={a.audit_readiness_score} />
+          <Kpi label={t("kpi.vendorCompliance")} value={a.vendor_compliance_rate} />
           <div className="bg-surface rounded-lg p-4">
-            <p className="text-xs text-neutral">Documents verified</p>
+            <p className="text-xs text-neutral">{t("kpi.docsVerified")}</p>
             <p className="text-2xl font-semibold text-gray-800">
               {a.documents_verified}/{a.documents_total}
             </p>
           </div>
-          <Kpi label="Pending approvals" value={a.pending_approvals} suffix="" invert />
-          <Kpi label="Open disputes" value={a.open_disputes} suffix="" invert />
+          <Kpi label={t("kpi.pendingApprovals")} value={a.pending_approvals} suffix="" invert />
+          <Kpi label={t("kpi.openDisputes")} value={a.open_disputes} suffix="" invert />
         </div>
       )}
     </Card>
@@ -54,23 +57,20 @@ export function AuditModule({ data }) {
 }
 
 export function AIModule({ data }) {
+  const { t } = useI18n();
   const ai = data.ai;
   return (
-    <Card title="AI Compliance Insights" wide>
+    <Card title={t("card.aiInsights")} wide>
       {!ai ? (
-        <p className="text-sm text-neutral">No insights.</p>
+        <p className="text-sm text-neutral">{t("empty.noInsights")}</p>
       ) : !ai.available ? (
-        <p className="text-sm text-warning">
-          AI engine is offline — insights unavailable. Start the
-          <code className="mx-1 bg-surface px-1 rounded">ai-engine</code>
-          service to enable predictive scoring and anomaly detection.
-        </p>
+        <p className="text-sm text-warning-text">{t("misc.aiOffline")}</p>
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Kpi label="Predictive score" value={ai.predictive_score ?? 0} />
+            <Kpi label={t("kpi.predictiveScore")} value={ai.predictive_score ?? 0} />
             <div className="bg-surface rounded-lg p-4">
-              <p className="text-xs text-neutral">Risk level</p>
+              <p className="text-xs text-neutral">{t("kpi.riskLevel")}</p>
               <p
                 className={`text-2xl font-semibold ${
                   ai.risk_level === "LOW"
@@ -83,20 +83,20 @@ export function AIModule({ data }) {
                 {ai.risk_level}
               </p>
             </div>
-            <Kpi label="Anomalies" value={ai.anomalies.length} suffix="" invert />
+            <Kpi label={t("kpi.anomalies")} value={ai.anomalies.length} suffix="" invert />
           </div>
           {ai.weak_factors.length > 0 && (
             <p className="text-sm text-gray-700">
-              Weak factors: {ai.weak_factors.join(", ")}
+              {t("misc.weakFactors")}: {ai.weak_factors.join(", ")}
             </p>
           )}
           {ai.anomalies.length > 0 && (
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral">
-                  <th className="py-1 font-medium">Type</th>
-                  <th className="font-medium">Severity</th>
-                  <th className="font-medium">Detail</th>
+                  <th scope="col" className="py-1 font-medium">{t("th.type")}</th>
+                  <th scope="col" className="font-medium">{t("th.severity")}</th>
+                  <th scope="col" className="font-medium">{t("th.detail")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -125,15 +125,16 @@ export function AIModule({ data }) {
 }
 
 export function ContractsModule({ data, canUpload, handleUpload }) {
+  const { t } = useI18n();
   return (
-    <Card title="Contracts" wide>
+    <Card title={t("card.contracts")} wide>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-white">
           <tr className="text-left text-neutral">
-            <th className="py-1 font-medium">Title</th>
-            <th className="font-medium">Status</th>
-            <th className="font-medium">Expiry</th>
-            <th className="font-medium">Document</th>
+            <th scope="col" className="py-1 font-medium">{t("th.title")}</th>
+            <th scope="col" className="font-medium">{t("th.status")}</th>
+            <th scope="col" className="font-medium">{t("th.expiry")}</th>
+            <th scope="col" className="font-medium">{t("th.document")}</th>
           </tr>
         </thead>
         <tbody>
@@ -144,11 +145,11 @@ export function ContractsModule({ data, canUpload, handleUpload }) {
               <tr key={c.contract_id} className="border-t border-gray-100 align-middle">
                 <td className="py-2">{c.title}</td>
                 <td><StatusPill value={c.status} /></td>
-                <td className={soon ? "text-warning font-medium" : ""}>
+                <td className={soon ? "text-warning-text font-medium" : ""}>
                   {day(c.expiry_date)}
                   {soon && (
                     <span className="ml-1 text-xs">
-                      {d < 0 ? "(expired)" : `(${d}d)`}
+                      {d < 0 ? `(${t("misc.expired")})` : `(${d}d)`}
                     </span>
                   )}
                 </td>
@@ -160,11 +161,11 @@ export function ContractsModule({ data, canUpload, handleUpload }) {
                       rel="noreferrer"
                       className="text-primary underline"
                     >
-                      view
+                      {t("btn.view")}
                     </a>
                   ) : canUpload ? (
                     <label className="text-neutral cursor-pointer underline">
-                      upload
+                      {t("btn.upload")}
                       <input
                         type="file"
                         className="hidden"
@@ -185,15 +186,16 @@ export function ContractsModule({ data, canUpload, handleUpload }) {
 }
 
 export function SafetyModule({ data }) {
+  const { t } = useI18n();
   return (
-    <Card title="Safety Audits" wide>
+    <Card title={t("card.safetyModule")} wide>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-white">
           <tr className="text-left text-neutral">
-            <th className="py-1 font-medium">Site</th>
-            <th className="font-medium">Audit date</th>
-            <th className="font-medium">Status</th>
-            <th className="font-medium">PPE %</th>
+            <th scope="col" className="py-1 font-medium">{t("th.site")}</th>
+            <th scope="col" className="font-medium">{t("th.auditDate")}</th>
+            <th scope="col" className="font-medium">{t("th.status")}</th>
+            <th scope="col" className="font-medium">{t("th.ppe")}</th>
           </tr>
         </thead>
         <tbody>
@@ -205,10 +207,10 @@ export function SafetyModule({ data }) {
               <td
                 className={
                   s.ppe_compliance >= 85
-                    ? "text-success font-medium"
+                    ? "text-success-text font-medium"
                     : s.ppe_compliance >= 60
-                    ? "text-warning font-medium"
-                    : "text-danger font-medium"
+                    ? "text-warning-text font-medium"
+                    : "text-danger-text font-medium"
                 }
               >
                 {s.ppe_compliance}%
@@ -222,15 +224,16 @@ export function SafetyModule({ data }) {
 }
 
 export function EnvironmentModule({ data }) {
+  const { t } = useI18n();
   return (
-    <Card title="Environmental Logs (pollution / waste)" wide>
+    <Card title={t("card.envModule")} wide>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-white">
           <tr className="text-left text-neutral">
-            <th className="py-1 font-medium">Type</th>
-            <th className="font-medium">Reading</th>
-            <th className="font-medium">Recorded</th>
-            <th className="font-medium">Notes</th>
+            <th scope="col" className="py-1 font-medium">{t("th.type")}</th>
+            <th scope="col" className="font-medium">{t("th.reading")}</th>
+            <th scope="col" className="font-medium">{t("th.recorded")}</th>
+            <th scope="col" className="font-medium">{t("th.notes")}</th>
           </tr>
         </thead>
         <tbody>
@@ -251,16 +254,17 @@ export function EnvironmentModule({ data }) {
 }
 
 export function LabourModule({ data, canAct, mutate }) {
+  const { t } = useI18n();
   return (
-    <Card title="Labour Compliance (PF / ESI / Wage)" wide>
+    <Card title={t("card.labourModule")} wide>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-white">
           <tr className="text-left text-neutral">
-            <th className="py-1 font-medium">Type</th>
-            <th className="font-medium">Period</th>
-            <th className="font-medium">Workers</th>
-            <th className="font-medium">Amount</th>
-            <th className="font-medium">Status</th>
+            <th scope="col" className="py-1 font-medium">{t("th.type")}</th>
+            <th scope="col" className="font-medium">{t("th.period")}</th>
+            <th scope="col" className="font-medium">{t("th.workers")}</th>
+            <th scope="col" className="font-medium">{t("th.amount")}</th>
+            <th scope="col" className="font-medium">{t("th.status")}</th>
             {canAct && <th></th>}
           </tr>
         </thead>
@@ -284,7 +288,7 @@ export function LabourModule({ data, canAct, mutate }) {
                       }
                       className="text-primary underline text-xs"
                     >
-                      mark filed
+                      {t("btn.markFiled")}
                     </button>
                   )}
                 </td>
@@ -298,15 +302,16 @@ export function LabourModule({ data, canAct, mutate }) {
 }
 
 export function ReraModule({ data, canAct, mutate }) {
+  const { t } = useI18n();
   return (
-    <Card title="RERA Filings" wide>
+    <Card title={t("card.reraModule")} wide>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-white">
           <tr className="text-left text-neutral">
-            <th className="py-1 font-medium">Project</th>
-            <th className="font-medium">Type</th>
-            <th className="font-medium">Due</th>
-            <th className="font-medium">Status</th>
+            <th scope="col" className="py-1 font-medium">{t("th.project")}</th>
+            <th scope="col" className="font-medium">{t("th.type")}</th>
+            <th scope="col" className="font-medium">{t("th.due")}</th>
+            <th scope="col" className="font-medium">{t("th.status")}</th>
             {canAct && <th></th>}
           </tr>
         </thead>
@@ -317,7 +322,7 @@ export function ReraModule({ data, canAct, mutate }) {
               <tr key={r.filing_id} className="border-t border-gray-100">
                 <td className="py-2">{r.project_name}</td>
                 <td>{r.filing_type}</td>
-                <td className={overdue ? "text-danger font-medium" : ""}>
+                <td className={overdue ? "text-danger-text font-medium" : ""}>
                   {day(r.due_date)}
                 </td>
                 <td><StatusPill value={r.status} /></td>
@@ -333,7 +338,7 @@ export function ReraModule({ data, canAct, mutate }) {
                         }
                         className="text-primary underline text-xs"
                       >
-                        mark filed
+                        {t("btn.markFiled")}
                       </button>
                     )}
                   </td>
@@ -348,15 +353,16 @@ export function ReraModule({ data, canAct, mutate }) {
 }
 
 export function VendorsModule({ data, canAct, mutate }) {
+  const { t } = useI18n();
   return (
-    <Card title="Vendor / Subcontractor Registry" wide>
+    <Card title={t("card.vendorsModule")} wide>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-white">
           <tr className="text-left text-neutral">
-            <th className="py-1 font-medium">Vendor</th>
-            <th className="font-medium">Certification</th>
-            <th className="font-medium">Cert. expiry</th>
-            <th className="font-medium">Status</th>
+            <th scope="col" className="py-1 font-medium">{t("th.vendor")}</th>
+            <th scope="col" className="font-medium">{t("th.certification")}</th>
+            <th scope="col" className="font-medium">{t("th.certExpiry")}</th>
+            <th scope="col" className="font-medium">{t("th.status")}</th>
             {canAct && <th></th>}
           </tr>
         </thead>
@@ -368,10 +374,10 @@ export function VendorsModule({ data, canAct, mutate }) {
               <tr key={v.vendor_id} className="border-t border-gray-100">
                 <td className="py-2">{v.name}</td>
                 <td>{v.certification_name || "—"}</td>
-                <td className={soon ? "text-warning font-medium" : ""}>
+                <td className={soon ? "text-warning-text font-medium" : ""}>
                   {v.certification_expiry
                     ? `${day(v.certification_expiry)}${
-                        soon ? (d < 0 ? " (expired)" : ` (${d}d)`) : ""
+                        soon ? (d < 0 ? ` (${t("misc.expired")})` : ` (${d}d)`) : ""
                       }`
                     : "—"}
                 </td>
@@ -390,7 +396,7 @@ export function VendorsModule({ data, canAct, mutate }) {
                       }
                       className="text-primary underline text-xs"
                     >
-                      {v.status === "ACTIVE" ? "suspend" : "reactivate"}
+                      {v.status === "ACTIVE" ? t("btn.suspend") : t("btn.reactivate")}
                     </button>
                   </td>
                 )}
@@ -404,17 +410,18 @@ export function VendorsModule({ data, canAct, mutate }) {
 }
 
 export function DisputesModule({ data, canAct, mutate }) {
+  const { t } = useI18n();
   return (
-    <Card title="Risk & Dispute Register" wide>
+    <Card title={t("card.disputesModule")} wide>
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-white">
           <tr className="text-left text-neutral">
-            <th className="py-1 font-medium">Title</th>
-            <th className="font-medium">Type</th>
-            <th className="font-medium">Counterparty</th>
-            <th className="font-medium">Amount</th>
-            <th className="font-medium">Status</th>
-            <th className="font-medium">Esc.</th>
+            <th scope="col" className="py-1 font-medium">{t("th.title")}</th>
+            <th scope="col" className="font-medium">{t("th.type")}</th>
+            <th scope="col" className="font-medium">{t("th.counterparty")}</th>
+            <th scope="col" className="font-medium">{t("th.amount")}</th>
+            <th scope="col" className="font-medium">{t("th.status")}</th>
+            <th scope="col" className="font-medium">{t("th.esc")}</th>
             {canAct && <th></th>}
           </tr>
         </thead>
@@ -438,9 +445,9 @@ export function DisputesModule({ data, canAct, mutate }) {
                             { id: d.dispute_id }
                           )
                         }
-                        className="text-warning underline text-xs"
+                        className="text-warning-text underline text-xs"
                       >
-                        escalate
+                        {t("btn.escalate")}
                       </button>
                       <button
                         onClick={() =>
@@ -449,9 +456,9 @@ export function DisputesModule({ data, canAct, mutate }) {
                             { id: d.dispute_id }
                           )
                         }
-                        className="text-success underline text-xs"
+                        className="text-success-text underline text-xs"
                       >
-                        resolve
+                        {t("btn.resolve")}
                       </button>
                     </>
                   )}
@@ -466,10 +473,11 @@ export function DisputesModule({ data, canAct, mutate }) {
 }
 
 export function BillingModule({ data, checkout, startCheckout, mutate }) {
+  const { t } = useI18n();
   return (
-    <Card title="Billing & Subscription" wide>
+    <Card title={t("card.billingModule")} wide>
       <p className="text-sm text-gray-700 mb-4">
-        Current plan:{" "}
+        {t("misc.currentPlan")}:{" "}
         <span className="font-semibold text-gray-800">
           {data.subscription?.plan_type || "—"}
         </span>{" "}
@@ -501,7 +509,7 @@ export function BillingModule({ data, checkout, startCheckout, mutate }) {
               <h4 className="font-semibold text-gray-800">{tier.name}</h4>
               <p className="text-2xl font-semibold text-gray-800 my-1">
                 ₹{tier.price_inr.toLocaleString("en-IN")}
-                <span className="text-xs font-normal text-neutral">/mo</span>
+                <span className="text-xs font-normal text-neutral">{t("misc.perMonth")}</span>
               </p>
               <ul className="text-xs text-neutral space-y-1 mb-3">
                 {tier.features.map((f) => (
@@ -509,7 +517,7 @@ export function BillingModule({ data, checkout, startCheckout, mutate }) {
                 ))}
               </ul>
               {current ? (
-                <span className="text-xs text-success font-medium">Current plan</span>
+                <span className="text-xs text-success-text font-medium">{t("misc.currentPlan")}</span>
               ) : (
                 <div className="space-x-3">
                   <button
@@ -521,13 +529,13 @@ export function BillingModule({ data, checkout, startCheckout, mutate }) {
                     }
                     className="text-primary underline text-xs"
                   >
-                    switch
+                    {t("btn.switch")}
                   </button>
                   <button
                     onClick={() => startCheckout(tier.code)}
                     className="text-neutral underline text-xs"
                   >
-                    checkout
+                    {t("btn.checkout")}
                   </button>
                 </div>
               )}
@@ -540,8 +548,9 @@ export function BillingModule({ data, checkout, startCheckout, mutate }) {
 }
 
 export function IntegrationsModule({ data, integrationMsg, runIntegration }) {
+  const { t } = useI18n();
   return (
-    <Card title="External Integrations" wide>
+    <Card title={t("card.integrationsModule")} wide>
       {integrationMsg && (
         <p className="text-sm mb-4 bg-surface text-gray-700 rounded p-3">
           {integrationMsg}
@@ -550,9 +559,9 @@ export function IntegrationsModule({ data, integrationMsg, runIntegration }) {
       <table className="w-full text-sm mb-4">
         <thead>
           <tr className="text-left text-neutral">
-            <th className="py-1 font-medium">Integration</th>
-            <th className="font-medium">Driver</th>
-            <th className="font-medium">Configured</th>
+            <th scope="col" className="py-1 font-medium">{t("th.integration")}</th>
+            <th scope="col" className="font-medium">{t("th.driver")}</th>
+            <th scope="col" className="font-medium">{t("th.configured")}</th>
           </tr>
         </thead>
         <tbody>
@@ -562,9 +571,9 @@ export function IntegrationsModule({ data, integrationMsg, runIntegration }) {
               <td>{i.driver}</td>
               <td>
                 {i.configured ? (
-                  <span className="text-success">live</span>
+                  <span className="text-success-text">live</span>
                 ) : (
-                  <span className="text-warning">stub</span>
+                  <span className="text-warning-text">stub</span>
                 )}
               </td>
             </tr>

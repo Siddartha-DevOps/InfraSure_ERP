@@ -14,9 +14,11 @@ export default {
           light: "#3552B4",
           soft: "#E8EDFB",
         },
-        success: { DEFAULT: "#10B981", soft: "#D1FAE5" },
-        warning: { DEFAULT: "#F59E0B", soft: "#FEF3C7" },
-        danger: { DEFAULT: "#DC2626", soft: "#FEE2E2" },
+        // *.text variants meet WCAG AA (≥4.5:1) for small text on white/soft
+        // backgrounds; DEFAULT stays for fills, charts, and large numerals.
+        success: { DEFAULT: "#10B981", soft: "#D1FAE5", text: "#047857" },
+        warning: { DEFAULT: "#F59E0B", soft: "#FEF3C7", text: "#B45309" },
+        danger: { DEFAULT: "#DC2626", soft: "#FEE2E2", text: "#B91C1C" },
         neutral: { DEFAULT: "#6B7280" },
         surface: "#F3F4F6",
       },

@@ -1,7 +1,10 @@
 // InfraSure ERP component library.
 // Design tokens (tailwind.config.js): primary #1E3A8A · success #10B981 ·
 // warning #F59E0B · danger #DC2626 · neutral #6B7280 · surface #F3F4F6.
-// Statuses always pair an icon/text with the color (WCAG: never color-only).
+// Statuses always pair an icon/text with the color (WCAG: never color-only);
+// *-text color variants keep small text at AA contrast.
+import { useEffect, useRef } from "react";
+import { useI18n } from "./i18n.jsx";
 
 export function Card({ title, children, wide, action }) {
   return (
@@ -23,13 +26,13 @@ export function Kpi({ label, value, suffix = "%", trend, invert = false }) {
   const tone =
     suffix !== "%"
       ? invert && n > 0
-        ? "text-danger"
+        ? "text-danger-text"
         : "text-gray-800"
       : n >= 85
-      ? "text-success"
+      ? "text-success-text"
       : n >= 60
-      ? "text-warning"
-      : "text-danger";
+      ? "text-warning-text"
+      : "text-danger-text";
   return (
     <div className="bg-surface rounded-lg p-4">
       <p className="text-xs text-neutral">{label}</p>
@@ -39,7 +42,7 @@ export function Kpi({ label, value, suffix = "%", trend, invert = false }) {
         {typeof trend === "number" && trend !== 0 && (
           <span
             className={`ml-2 text-sm align-middle ${
-              trend > 0 ? "text-success" : "text-danger"
+              trend > 0 ? "text-success-text" : "text-danger-text"
             }`}
             aria-label={trend > 0 ? "trending up" : "trending down"}
           >
@@ -52,31 +55,32 @@ export function Kpi({ label, value, suffix = "%", trend, invert = false }) {
 }
 
 const STATUS_STYLE = {
-  FILED: { tone: "text-success bg-success-soft", icon: "✓" },
-  APPROVED: { tone: "text-success bg-success-soft", icon: "✓" },
-  COMPLETED: { tone: "text-success bg-success-soft", icon: "✓" },
-  ACTIVE: { tone: "text-success bg-success-soft", icon: "✓" },
-  RESOLVED: { tone: "text-success bg-success-soft", icon: "✓" },
-  PAID: { tone: "text-success bg-success-soft", icon: "✓" },
-  PENDING: { tone: "text-warning bg-warning-soft", icon: "•" },
-  OPEN: { tone: "text-warning bg-warning-soft", icon: "•" },
-  DUE: { tone: "text-warning bg-warning-soft", icon: "•" },
-  IN_ARBITRATION: { tone: "text-warning bg-warning-soft", icon: "•" },
+  FILED: { tone: "text-success-text bg-success-soft", icon: "✓" },
+  APPROVED: { tone: "text-success-text bg-success-soft", icon: "✓" },
+  COMPLETED: { tone: "text-success-text bg-success-soft", icon: "✓" },
+  ACTIVE: { tone: "text-success-text bg-success-soft", icon: "✓" },
+  RESOLVED: { tone: "text-success-text bg-success-soft", icon: "✓" },
+  PAID: { tone: "text-success-text bg-success-soft", icon: "✓" },
+  PENDING: { tone: "text-warning-text bg-warning-soft", icon: "•" },
+  OPEN: { tone: "text-warning-text bg-warning-soft", icon: "•" },
+  DUE: { tone: "text-warning-text bg-warning-soft", icon: "•" },
+  IN_ARBITRATION: { tone: "text-warning-text bg-warning-soft", icon: "•" },
   DRAFT: { tone: "text-neutral bg-surface", icon: "•" },
-  FAILED: { tone: "text-danger bg-danger-soft", icon: "✗" },
-  ESCALATED: { tone: "text-danger bg-danger-soft", icon: "!" },
-  OVERDUE: { tone: "text-danger bg-danger-soft", icon: "!" },
-  SUSPENDED: { tone: "text-danger bg-danger-soft", icon: "✗" },
+  FAILED: { tone: "text-danger-text bg-danger-soft", icon: "✗" },
+  ESCALATED: { tone: "text-danger-text bg-danger-soft", icon: "!" },
+  OVERDUE: { tone: "text-danger-text bg-danger-soft", icon: "!" },
+  SUSPENDED: { tone: "text-danger-text bg-danger-soft", icon: "✗" },
 };
 
 export function StatusPill({ value }) {
+  const { t } = useI18n();
   const s = STATUS_STYLE[value] || { tone: "text-neutral bg-surface", icon: "•" };
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${s.tone}`}
     >
       <span aria-hidden="true">{s.icon}</span>
-      {value}
+      {t(`status.${value}`)}
     </span>
   );
 }
@@ -164,6 +168,14 @@ export function LineChart({ data, color = "#10B981", height = 120 }) {
 // ---- Modal (approvals, uploads, forms) ----
 
 export function Modal({ open, title, onClose, children }) {
+  const panelRef = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.focus();
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
   if (!open) return null;
   return (
     <div
@@ -174,7 +186,9 @@ export function Modal({ open, title, onClose, children }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md p-6"
+        ref={panelRef}
+        tabIndex={-1}
+        className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -200,7 +214,7 @@ export function Field({ label, error, children }) {
       <span className="block text-sm font-medium text-gray-700 mb-1">{label}</span>
       {children}
       {error && (
-        <span className="block text-xs text-danger mt-1" role="alert">
+        <span className="block text-xs text-danger-text mt-1" role="alert">
           {error}
         </span>
       )}
@@ -230,17 +244,18 @@ export function Button({ children, variant = "primary", ...props }) {
 // ---- Alerts feed (severity-coded) ----
 
 const SEVERITY_STYLE = {
-  critical: { dot: "bg-danger", label: "Critical", text: "text-danger" },
-  warning: { dot: "bg-warning", label: "Warning", text: "text-warning" },
-  ok: { dot: "bg-success", label: "OK", text: "text-success" },
+  critical: { dot: "bg-danger", key: "sev.critical", text: "text-danger-text" },
+  warning: { dot: "bg-warning", key: "sev.warning", text: "text-warning-text" },
+  ok: { dot: "bg-success", key: "sev.ok", text: "text-success-text" },
 };
 
 export function AlertsFeed({ alerts, compact = false }) {
+  const { t } = useI18n();
   if (!alerts?.length)
     return (
-      <p className="text-sm text-success flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-success" aria-hidden="true" /> All
-        clear — no active alerts.
+      <p className="text-sm text-success-text flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-success" aria-hidden="true" />
+        {t("alerts.allclear")}
       </p>
     );
   return (
@@ -254,7 +269,7 @@ export function AlertsFeed({ alerts, compact = false }) {
               aria-hidden="true"
             />
             <div>
-              <span className={`font-medium mr-1 ${s.text}`}>{s.label}:</span>
+              <span className={`font-medium mr-1 ${s.text}`}>{t(s.key)}:</span>
               <span className="text-gray-700">{a.text}</span>
               <span className="text-neutral text-xs ml-1">· {a.module}</span>
             </div>
@@ -268,12 +283,13 @@ export function AlertsFeed({ alerts, compact = false }) {
 // ---- Site status board (map placeholder until geo-tagged projects exist) ----
 
 const SITE_TONE = {
-  COMPLETED: "bg-success-soft text-success",
-  PENDING: "bg-warning-soft text-warning",
-  FAILED: "bg-danger-soft text-danger",
+  COMPLETED: "bg-success-soft text-success-text",
+  PENDING: "bg-warning-soft text-warning-text",
+  FAILED: "bg-danger-soft text-danger-text",
 };
 
 export function SiteBoard({ safety }) {
+  const { t } = useI18n();
   // Latest status per site from safety audits.
   const bySite = new Map();
   for (const s of safety || []) {
@@ -295,13 +311,11 @@ export function SiteBoard({ safety }) {
             <span className="text-xs" aria-hidden="true">
               {status === "COMPLETED" ? "🟢" : status === "FAILED" ? "🔴" : "🟡"}
             </span>
-            {site}
+            {site} · {t(`status.${status}`)}
           </span>
         ))}
       </div>
-      <p className="text-xs text-neutral mt-2">
-        Geo-map view arrives once mobile DPRs supply site coordinates.
-      </p>
+      <p className="text-xs text-neutral mt-2">{t("misc.geoNote")}</p>
     </div>
   );
 }

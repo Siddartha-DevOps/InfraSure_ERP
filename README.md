@@ -114,15 +114,22 @@ Tokens live in `apps/web/tailwind.config.js`; components in `apps/web/src/ui.jsx
   expiring certificates) · Project Manager/Admin (portfolio, trends, consolidated alerts,
   approvals).
 - **Internationalization (EN / हिन्दी / తెలుగు):** `src/i18n.jsx` provides a
-  `useI18n()` hook + language switcher (top bar); covers the app chrome (nav, login,
-  alerts, quick actions, map). `t()` falls back to English then the key, so partial
-  coverage degrades gracefully — extend the dictionaries to localize more strings.
+  `useI18n()` hook (with `{var}` interpolation) + language switcher (top bar). Coverage
+  spans the full UI: chrome, dashboards, module tables, KPI labels, statuses, alerts
+  (templated), forms, and validation messages. The active language is mirrored onto
+  `<html lang>`. `t()` falls back to English then the key, so partial coverage degrades
+  gracefully.
 - **Geo project map:** `src/ProjectMap.jsx` (Leaflet + OpenStreetMap) plots `Site`
   records as status-colored markers (🟢 compliant / 🟡 pending / 🔴 non-compliant) on the
   Project Map tab and the PM/Admin home. Backed by the `Site` model + `getSites` /
-  `createSite` / `updateSiteStatus`.
-- **Still pending from the design spec:** a full WCAG 2.1 AA audit beyond the included
-  aria/focus/contrast basics, and localizing the remaining table/body strings.
+  `createSite` / `updateSiteStatus`. **Geo-tagged mobile DPRs auto-populate the map:**
+  `createDPR` parses the report's `location {lat, lng}` (+ optional `site_name`) and
+  reuses a site within ~100 m or creates a new one (`apps/api/src/geo.js`).
+- **Accessibility (WCAG 2.1 AA pass):** AA-contrast `*-text` color tokens for small text
+  (`#047857` / `#B45309` / `#B91C1C`), skip-to-content link, `<html lang>` switching,
+  `scope="col"` table headers, modal Escape-close + focus management, aria labels/roles,
+  focus-visible rings, and icon+text statuses (never color-only). Remaining known gap:
+  AI-engine anomaly sentences arrive in English from the Python service.
 
 ## Testing (resolver / security suite)
 

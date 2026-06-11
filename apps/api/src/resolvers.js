@@ -11,6 +11,7 @@ import {
   signToken,
 } from "./auth.js";
 import { listTiers, createCheckoutSession, isValidPlan } from "./billing.js";
+import { extractGeoFromReport, isSameSite } from "./geo.js";
 import { getInsights } from "./ai.js";
 import {
   integrationStatus,
@@ -591,11 +592,38 @@ export const resolvers = {
       const dpr = await prisma.dpr.create({
         data: { tenant_id: args.tenant_id, report_data: args.report_data },
       });
+
+      // Geo-tagged DPRs (mobile) auto-populate the project map: reuse a site
+      // within ~100m, otherwise create one. Failures never break the DPR.
+      let site_id = null;
+      const geo = extractGeoFromReport(args.report_data);
+      if (geo) {
+        try {
+          const sites = await prisma.site.findMany({
+            where: { tenant_id: args.tenant_id },
+          });
+          const existing = sites.find((s) => isSameSite(geo, s));
+          const site =
+            existing ??
+            (await prisma.site.create({
+              data: {
+                tenant_id: args.tenant_id,
+                name: geo.name,
+                latitude: geo.lat,
+                longitude: geo.lng,
+              },
+            }));
+          site_id = site.site_id;
+        } catch (err) {
+          console.error("[geo] site upsert failed:", err.message);
+        }
+      }
+
       await writeAuditLog({
         tenant_id: args.tenant_id,
         user_id: user.user_id,
         action: "createDPR",
-        metadata: { dpr_id: dpr.dpr_id },
+        metadata: { dpr_id: dpr.dpr_id, ...(site_id ? { site_id } : {}) },
       });
       return dpr;
     },
