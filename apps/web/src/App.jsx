@@ -297,7 +297,7 @@ function Dashboard({ session, onLogout }) {
   }, [user.tenant_id, user.role, reload]);
 
   const refresh = () => setReload((n) => n + 1);
-  const alerts = useMemo(() => buildAlerts(data), [data]);
+  const alerts = useMemo(() => buildAlerts(data, tr), [data, tr]);
   const canUpload = ["ADMIN", "PROJECT_MANAGER", "COMPLIANCE_OFFICER"].includes(
     user.role
   );
@@ -387,12 +387,18 @@ function Dashboard({ session, onLogout }) {
 
   return (
     <div className="min-h-screen bg-surface flex">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:text-primary focus:px-4 focus:py-2 focus:rounded-lg"
+      >
+        {tr("a11y.skip")}
+      </a>
       <Sidebar tabs={tabs} tab={tab} setTab={setTab} quickActions={quickActions} />
 
       <div className="flex-1 min-w-0">
         <TopBar user={user} tenant={tenant} alerts={alerts} onLogout={onLogout} />
 
-        <main className="p-6 grid gap-5 md:grid-cols-2" aria-live="polite">
+        <main id="main" className="p-6 grid gap-5 md:grid-cols-2" aria-live="polite">
           {err && (
             <p className="text-danger col-span-2" role="alert">
               {err}

@@ -13,6 +13,7 @@ import {
   Button,
 } from "./ui.jsx";
 import { ProjectMap } from "./ProjectMap.jsx";
+import { useI18n } from "./i18n.jsx";
 
 const day = (iso) => (iso || "").slice(0, 10);
 const pct = (n, total) => (total === 0 ? 100 : Math.round((n / total) * 100));
@@ -33,6 +34,7 @@ function dprTrend(dprs, days = 7) {
 
 // ---------- Engineer ----------
 export function EngineerHome({ data }) {
+  const { t } = useI18n();
   const safety = data.safety || [];
   const done = safety.filter((s) => s.checklist_status === "COMPLETED").length;
   const avgPpe = safety.length
@@ -42,22 +44,22 @@ export function EngineerHome({ data }) {
 
   return (
     <>
-      <Card title="Site KPIs" wide>
+      <Card title={t("card.siteKpis")} wide>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Kpi label="Safety audits completed" value={pct(done, safety.length)} />
-          <Kpi label="Avg PPE compliance" value={avgPpe} />
-          <Kpi label="DPRs filed" value={(data.dprs || []).length} suffix="" />
-          <Kpi label="Pending site tasks" value={pendingTasks.length} suffix="" invert />
+          <Kpi label={t("kpi.safetyDone")} value={pct(done, safety.length)} />
+          <Kpi label={t("kpi.avgPpe")} value={avgPpe} />
+          <Kpi label={t("kpi.dprsFiled")} value={(data.dprs || []).length} suffix="" />
+          <Kpi label={t("kpi.pendingTasks")} value={pendingTasks.length} suffix="" invert />
         </div>
       </Card>
 
-      <Card title="Site status">
+      <Card title={t("card.siteStatus")}>
         <SiteBoard safety={safety} />
       </Card>
 
-      <Card title="Pending site tasks">
+      <Card title={t("card.pendingTasks")}>
         {pendingTasks.length === 0 ? (
-          <p className="text-sm text-success">No pending tasks. ✓</p>
+          <p className="text-sm text-success-text">{t("empty.noTasks")}</p>
         ) : (
           <ul className="space-y-2 text-sm">
             {pendingTasks.map((s) => (
@@ -70,17 +72,17 @@ export function EngineerHome({ data }) {
         )}
       </Card>
 
-      <Card title="Recent Daily Progress Reports" wide>
+      <Card title={t("card.recentDprs")} wide>
         {(data.dprs || []).length === 0 ? (
           <p className="text-sm text-neutral">
-            No DPRs yet — use “New DPR” in the sidebar.
+            {t("empty.noDprs")}
           </p>
         ) : (
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white">
               <tr className="text-left text-neutral">
-                <th className="py-1 font-medium">Date</th>
-                <th className="font-medium">Report</th>
+                <th scope="col" className="py-1 font-medium">{t("th.date")}</th>
+                <th scope="col" className="font-medium">{t("th.report")}</th>
               </tr>
             </thead>
             <tbody>
@@ -99,14 +101,14 @@ export function EngineerHome({ data }) {
         )}
       </Card>
 
-      <Card title="Safety audits & incidents" wide>
+      <Card title={t("card.safetyAudits")} wide>
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white">
             <tr className="text-left text-neutral">
-              <th className="py-1 font-medium">Site</th>
-              <th className="font-medium">Date</th>
-              <th className="font-medium">Status</th>
-              <th className="font-medium">PPE %</th>
+              <th scope="col" className="py-1 font-medium">{t("th.site")}</th>
+              <th scope="col" className="font-medium">{t("th.date")}</th>
+              <th scope="col" className="font-medium">{t("th.status")}</th>
+              <th scope="col" className="font-medium">{t("th.ppe")}</th>
             </tr>
           </thead>
           <tbody>
@@ -118,10 +120,10 @@ export function EngineerHome({ data }) {
                 <td
                   className={
                     s.ppe_compliance >= 85
-                      ? "text-success font-medium"
+                      ? "text-success-text font-medium"
                       : s.ppe_compliance >= 60
-                      ? "text-warning font-medium"
-                      : "text-danger font-medium"
+                      ? "text-warning-text font-medium"
+                      : "text-danger-text font-medium"
                   }
                 >
                   {s.ppe_compliance}%
@@ -137,6 +139,7 @@ export function EngineerHome({ data }) {
 
 // ---------- Accountant ----------
 export function AccountantHome({ data, mutate }) {
+  const { t } = useI18n();
   const fin = data.finance || [];
   const overdue = fin.filter(
     (f) => !f.paid_date && new Date(f.due_date) < new Date()
@@ -145,16 +148,16 @@ export function AccountantHome({ data, mutate }) {
 
   return (
     <>
-      <Card title="Financial compliance KPIs" wide>
+      <Card title={t("card.financeKpis")} wide>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Kpi label="GST filing" value={k ? k.gst_filing_compliance : 0} />
-          <Kpi label="TDS filing" value={k ? k.tds_filing_compliance : 0} />
-          <Kpi label="RA bill approval" value={k ? k.ra_bill_approval_rate : 0} />
-          <Kpi label="Overdue payments" value={overdue} suffix="" invert />
+          <Kpi label={t("kpi.gst")} value={k ? k.gst_filing_compliance : 0} />
+          <Kpi label={t("kpi.tds")} value={k ? k.tds_filing_compliance : 0} />
+          <Kpi label={t("kpi.ra")} value={k ? k.ra_bill_approval_rate : 0} />
+          <Kpi label={t("kpi.overdue")} value={overdue} suffix="" invert />
         </div>
       </Card>
 
-      <Card title="Filing status">
+      <Card title={t("card.filingStatus")}>
         <BarChart
           data={[
             {
@@ -185,7 +188,7 @@ export function AccountantHome({ data, mutate }) {
         />
       </Card>
 
-      <Card title="Amounts by due month">
+      <Card title={t("card.amountsByMonth")}>
         <LineChart
           data={Object.entries(
             fin.reduce((acc, f) => {
@@ -197,19 +200,19 @@ export function AccountantHome({ data, mutate }) {
             .sort()
             .map(([m, v]) => ({ label: m.slice(5), value: Math.round(v / 1000) }))}
         />
-        <p className="text-xs text-neutral">₹ thousands per month</p>
+        <p className="text-xs text-neutral">{t("misc.thousandsPerMonth")}</p>
       </Card>
 
-      <Card title="GST / TDS filings & RA bills" wide>
+      <Card title={t("card.filings")} wide>
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white">
             <tr className="text-left text-neutral">
-              <th className="py-1 font-medium">Invoice</th>
-              <th className="font-medium">Amount</th>
-              <th className="font-medium">GST</th>
-              <th className="font-medium">TDS</th>
-              <th className="font-medium">RA bill</th>
-              <th className="font-medium">Payment</th>
+              <th scope="col" className="py-1 font-medium">{t("th.invoice")}</th>
+              <th scope="col" className="font-medium">{t("th.amount")}</th>
+              <th scope="col" className="font-medium">{t("th.gst")}</th>
+              <th scope="col" className="font-medium">{t("th.tds")}</th>
+              <th scope="col" className="font-medium">{t("th.raBill")}</th>
+              <th scope="col" className="font-medium">{t("th.payment")}</th>
               <th></th>
             </tr>
           </thead>
@@ -239,7 +242,7 @@ export function AccountantHome({ data, mutate }) {
                           )
                         }
                       >
-                        file GST
+                        {t("btn.fileGst")}
                       </button>
                     )}
                     {f.tds_status !== "FILED" && (
@@ -252,12 +255,12 @@ export function AccountantHome({ data, mutate }) {
                           )
                         }
                       >
-                        file TDS
+                        {t("btn.fileTds")}
                       </button>
                     )}
                     {f.ra_bill_status !== "APPROVED" && (
                       <button
-                        className="text-success underline"
+                        className="text-success-text underline"
                         onClick={() =>
                           mutate(
                             `mutation($t:ID!,$id:ID!){approveRABill(tenant_id:$t,finance_id:$id){finance_id}}`,
@@ -265,7 +268,7 @@ export function AccountantHome({ data, mutate }) {
                           )
                         }
                       >
-                        approve RA
+                        {t("btn.approveRa")}
                       </button>
                     )}
                     {!f.paid_date && (
@@ -278,7 +281,7 @@ export function AccountantHome({ data, mutate }) {
                           )
                         }
                       >
-                        record payment
+                        {t("btn.recordPayment")}
                       </button>
                     )}
                   </td>
@@ -294,6 +297,7 @@ export function AccountantHome({ data, mutate }) {
 
 // ---------- Compliance Officer ----------
 export function OfficerHome({ data }) {
+  const { t } = useI18n();
   const audit = data.audit;
   const certVendors = (data.vendors || []).filter((v) => {
     if (!v.certification_expiry) return false;
@@ -302,28 +306,28 @@ export function OfficerHome({ data }) {
 
   return (
     <>
-      <Card title="Audit readiness" wide>
+      <Card title={t("card.auditReadiness")} wide>
         {!audit ? (
-          <p className="text-sm text-neutral">No audit data.</p>
+          <p className="text-sm text-neutral">{t("empty.noAudit")}</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Kpi label="Readiness score" value={audit.audit_readiness_score} />
-            <Kpi label="Vendor compliance" value={audit.vendor_compliance_rate} />
+            <Kpi label={t("kpi.readinessScore")} value={audit.audit_readiness_score} />
+            <Kpi label={t("kpi.vendorCompliance")} value={audit.vendor_compliance_rate} />
             <div className="bg-surface rounded-lg p-4">
-              <p className="text-xs text-neutral">Documents verified</p>
+              <p className="text-xs text-neutral">{t("kpi.docsVerified")}</p>
               <p className="text-2xl font-semibold text-gray-800">
                 {audit.documents_verified}/{audit.documents_total}
               </p>
             </div>
-            <Kpi label="Pending approvals" value={audit.pending_approvals} suffix="" invert />
-            <Kpi label="Open disputes" value={audit.open_disputes} suffix="" invert />
+            <Kpi label={t("kpi.pendingApprovals")} value={audit.pending_approvals} suffix="" invert />
+            <Kpi label={t("kpi.openDisputes")} value={audit.open_disputes} suffix="" invert />
           </div>
         )}
       </Card>
 
-      <Card title="Expiring certificates (30 days)">
+      <Card title={t("card.expiringCerts")}>
         {certVendors.length === 0 ? (
-          <p className="text-sm text-success">No certificates expiring soon. ✓</p>
+          <p className="text-sm text-success-text">{t("empty.noCerts")}</p>
         ) : (
           <ul className="space-y-2 text-sm">
             {certVendors.map((v) => (
@@ -331,7 +335,7 @@ export function OfficerHome({ data }) {
                 <span className="text-gray-700">
                   {v.name} — {v.certification_name}
                 </span>
-                <span className="text-warning font-medium">
+                <span className="text-warning-text font-medium">
                   {day(v.certification_expiry)}
                 </span>
               </li>
@@ -340,13 +344,13 @@ export function OfficerHome({ data }) {
         )}
       </Card>
 
-      <Card title="Environmental logs">
+      <Card title={t("card.envLogs")}>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral">
-              <th className="py-1 font-medium">Type</th>
-              <th className="font-medium">Reading</th>
-              <th className="font-medium">Date</th>
+              <th scope="col" className="py-1 font-medium">{t("th.type")}</th>
+              <th scope="col" className="font-medium">{t("th.reading")}</th>
+              <th scope="col" className="font-medium">{t("th.date")}</th>
             </tr>
           </thead>
           <tbody>
@@ -363,14 +367,14 @@ export function OfficerHome({ data }) {
         </table>
       </Card>
 
-      <Card title="Labour compliance" wide>
+      <Card title={t("card.labour")} wide>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral">
-              <th className="py-1 font-medium">Filing</th>
-              <th className="font-medium">Period</th>
-              <th className="font-medium">Workers</th>
-              <th className="font-medium">Status</th>
+              <th scope="col" className="py-1 font-medium">{t("th.type")}</th>
+              <th scope="col" className="font-medium">{t("th.period")}</th>
+              <th scope="col" className="font-medium">{t("th.workers")}</th>
+              <th scope="col" className="font-medium">{t("th.status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -391,6 +395,7 @@ export function OfficerHome({ data }) {
 
 // ---------- Project Manager / Admin ----------
 export function PMHome({ data, alerts, mutate, canApprove }) {
+  const { t } = useI18n();
   const k = data.kpis;
   const audit = data.audit;
   const pendingSteps = (data.steps || []).filter((s) => s.status === "PENDING");
@@ -401,45 +406,45 @@ export function PMHome({ data, alerts, mutate, canApprove }) {
 
   return (
     <>
-      <Card title="Portfolio summary" wide>
+      <Card title={t("card.portfolio")} wide>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Kpi label="Active contracts" value={(data.contracts || []).length} suffix="" />
+          <Kpi label={t("kpi.activeContracts")} value={(data.contracts || []).length} suffix="" />
           <Kpi
-            label="Audit readiness"
+            label={t("kpi.readiness")}
             value={audit ? audit.audit_readiness_score : k ? k.audit_readiness_score : 0}
           />
-          <Kpi label="Safety completion" value={k ? k.safety_audit_completion : 0} />
+          <Kpi label={t("kpi.safetyCompletion")} value={k ? k.safety_audit_completion : 0} />
           <Kpi
-            label="Open disputes"
+            label={t("kpi.openDisputes")}
             value={(data.disputes || []).filter((d) => d.status !== "RESOLVED").length}
             suffix=""
             invert
           />
-          <Kpi label="Overdue payments" value={k ? k.overdue_payments : 0} suffix="" invert />
+          <Kpi label={t("kpi.overdue")} value={k ? k.overdue_payments : 0} suffix="" invert />
         </div>
       </Card>
 
-      <Card title="Critical alerts" wide>
+      <Card title={t("card.criticalAlerts")} wide>
         <AlertsFeed alerts={alerts} compact />
       </Card>
 
       <ProjectMap sites={data.sites} />
 
-      <Card title="DPR activity (last 7 days)">
+      <Card title={t("card.dprActivity")}>
         <BarChart data={dprTrend(data.dprs)} />
       </Card>
 
-      <Card title="PPE compliance by site">
+      <Card title={t("card.ppeBySite")}>
         <BarChart data={siteBars} color="#10B981" />
       </Card>
 
-      <Card title="Project sites">
+      <Card title={t("card.projectSites")}>
         <SiteBoard safety={safety} />
       </Card>
 
-      <Card title="Pending approvals">
+      <Card title={t("card.pendingApprovals")}>
         {pendingSteps.length === 0 ? (
-          <p className="text-sm text-success">Nothing awaiting approval. ✓</p>
+          <p className="text-sm text-success-text">{t("empty.noApprovals")}</p>
         ) : (
           <ul className="space-y-2 text-sm">
             {pendingSteps.map((s) => (
@@ -455,7 +460,7 @@ export function PMHome({ data, alerts, mutate, canApprove }) {
                       )
                     }
                   >
-                    Approve
+                    {t("btn.approve")}
                   </Button>
                 ) : (
                   <StatusPill value={s.status} />

@@ -1,8 +1,9 @@
 // Builds the consolidated, severity-sorted alerts feed from loaded dashboard data.
+// Pass the i18n t(key, vars) so alert sentences localize with the active language.
 const daysUntil = (iso) =>
   iso ? Math.ceil((new Date(iso) - new Date()) / 86400000) : Infinity;
 
-export function buildAlerts(data) {
+export function buildAlerts(data, t = (k) => k) {
   const alerts = [];
 
   for (const c of data.expiring || []) {
@@ -11,9 +12,9 @@ export function buildAlerts(data) {
       severity: d < 0 ? "critical" : "warning",
       text:
         d < 0
-          ? `Contract "${c.title}" expired ${-d}d ago`
-          : `Contract "${c.title}" expires in ${d}d`,
-      module: "Contracts",
+          ? t("alert.contractExpired", { title: c.title, days: -d })
+          : t("alert.contractExpiring", { title: c.title, days: d }),
+      module: t("nav.contracts"),
     });
   }
 
@@ -21,10 +22,11 @@ export function buildAlerts(data) {
     if (!f.paid_date && daysUntil(f.due_date) < 0) {
       alerts.push({
         severity: "critical",
-        text: `Invoice ${f.invoice_number || f.finance_id} overdue (₹${Number(
-          f.amount
-        ).toLocaleString("en-IN")})`,
-        module: "Finance",
+        text: t("alert.invoiceOverdue", {
+          invoice: f.invoice_number || f.finance_id,
+          amount: Number(f.amount).toLocaleString("en-IN"),
+        }),
+        module: t("nav.finance"),
       });
     }
   }
@@ -33,8 +35,8 @@ export function buildAlerts(data) {
     if (r.status === "PENDING" && daysUntil(r.due_date) < 0) {
       alerts.push({
         severity: "critical",
-        text: `RERA filing overdue — ${r.project_name}`,
-        module: "RERA",
+        text: t("alert.reraOverdue", { project: r.project_name }),
+        module: t("nav.rera"),
       });
     }
   }
@@ -46,9 +48,9 @@ export function buildAlerts(data) {
         severity: d < 0 ? "critical" : "warning",
         text:
           d < 0
-            ? `${v.name} certification expired`
-            : `${v.name} certification expires in ${d}d`,
-        module: "Vendors",
+            ? t("alert.certExpired", { vendor: v.name })
+            : t("alert.certExpiring", { vendor: v.name, days: d }),
+        module: t("nav.vendors"),
       });
     }
   }
@@ -56,8 +58,8 @@ export function buildAlerts(data) {
   for (const a of data.ai?.anomalies || []) {
     alerts.push({
       severity: a.severity === "HIGH" ? "critical" : "warning",
-      text: a.detail,
-      module: "AI",
+      text: a.detail, // AI engine output (English; localizable in a later pass)
+      module: t("nav.ai"),
     });
   }
 
@@ -65,14 +67,14 @@ export function buildAlerts(data) {
     if (d.status === "ESCALATED") {
       alerts.push({
         severity: "critical",
-        text: `Dispute escalated — ${d.title}`,
-        module: "Disputes",
+        text: t("alert.disputeEscalated", { title: d.title }),
+        module: t("nav.disputes"),
       });
     } else if (d.status !== "RESOLVED") {
       alerts.push({
         severity: "warning",
-        text: `Open dispute — ${d.title}`,
-        module: "Disputes",
+        text: t("alert.disputeOpen", { title: d.title }),
+        module: t("nav.disputes"),
       });
     }
   }
@@ -81,8 +83,8 @@ export function buildAlerts(data) {
     if (l.status === "PENDING") {
       alerts.push({
         severity: "warning",
-        text: `${l.filing_type} filing pending for ${l.period}`,
-        module: "Labour",
+        text: t("alert.labourPending", { type: l.filing_type, period: l.period }),
+        module: t("nav.labour"),
       });
     }
   }

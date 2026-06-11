@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { gql } from "./api.js";
 import { Modal, Field, Button, inputCls } from "./ui.jsx";
+import { useI18n } from "./i18n.jsx";
 
 function useForm(initial) {
   const [values, setValues] = useState(initial);
@@ -12,12 +13,13 @@ function useForm(initial) {
 }
 
 export function NewDPRModal({ open, onClose, tenantId, onDone }) {
+  const { t } = useI18n();
   const f = useForm({ report: "" });
 
   async function submit(e) {
     e.preventDefault();
     if (!f.values.report.trim())
-      return f.setErrors({ report: "Report notes are required." });
+      return f.setErrors({ report: t("err.reportRequired") });
     f.setBusy(true);
     try {
       await gql(
@@ -36,9 +38,9 @@ export function NewDPRModal({ open, onClose, tenantId, onDone }) {
   }
 
   return (
-    <Modal open={open} title="New Daily Progress Report" onClose={onClose}>
+    <Modal open={open} title={t("qa.newDPR")} onClose={onClose}>
       <form onSubmit={submit}>
-        <Field label="Progress notes" error={f.errors.report}>
+        <Field label={t("form.progressNotes")} error={f.errors.report}>
           <textarea
             className={`${inputCls} h-28`}
             value={f.values.report}
@@ -48,10 +50,10 @@ export function NewDPRModal({ open, onClose, tenantId, onDone }) {
         </Field>
         <div className="flex justify-end gap-2 mt-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
+            {t("btn.cancel")}
           </Button>
           <Button type="submit" disabled={f.busy}>
-            {f.busy ? "Saving…" : "Submit DPR"}
+            {f.busy ? t("btn.saving") : t("btn.submitDpr")}
           </Button>
         </div>
       </form>
@@ -60,15 +62,16 @@ export function NewDPRModal({ open, onClose, tenantId, onDone }) {
 }
 
 export function SafetyAuditModal({ open, onClose, tenantId, onDone }) {
+  const { t } = useI18n();
   const f = useForm({ site: "", status: "COMPLETED", ppe: "90" });
 
   async function submit(e) {
     e.preventDefault();
     const errs = {};
-    if (!f.values.site.trim()) errs.site = "Site name is required.";
+    if (!f.values.site.trim()) errs.site = t("err.siteRequired");
     const ppe = Number(f.values.ppe);
     if (Number.isNaN(ppe) || ppe < 0 || ppe > 100)
-      errs.ppe = "PPE % must be between 0 and 100.";
+      errs.ppe = t("err.ppeRange");
     if (Object.keys(errs).length) return f.setErrors(errs);
 
     f.setBusy(true);
@@ -88,9 +91,9 @@ export function SafetyAuditModal({ open, onClose, tenantId, onDone }) {
   }
 
   return (
-    <Modal open={open} title="Log Safety Audit" onClose={onClose}>
+    <Modal open={open} title={t("qa.logSafety")} onClose={onClose}>
       <form onSubmit={submit}>
-        <Field label="Site name" error={f.errors.site}>
+        <Field label={t("form.siteName")} error={f.errors.site}>
           <input
             className={inputCls}
             value={f.values.site}
@@ -98,14 +101,14 @@ export function SafetyAuditModal({ open, onClose, tenantId, onDone }) {
             placeholder="Site A — Pier Casting"
           />
         </Field>
-        <Field label="Checklist status">
+        <Field label={t("form.checklistStatus")}>
           <select className={inputCls} value={f.values.status} onChange={f.set("status")}>
-            <option value="COMPLETED">Completed</option>
-            <option value="PENDING">Pending</option>
-            <option value="FAILED">Failed</option>
+            <option value="COMPLETED">{t("form.optCompleted")}</option>
+            <option value="PENDING">{t("form.optPending")}</option>
+            <option value="FAILED">{t("form.optFailed")}</option>
           </select>
         </Field>
-        <Field label="PPE compliance %" error={f.errors.ppe}>
+        <Field label={t("form.ppe")} error={f.errors.ppe}>
           <input
             type="number"
             min="0"
@@ -117,10 +120,10 @@ export function SafetyAuditModal({ open, onClose, tenantId, onDone }) {
         </Field>
         <div className="flex justify-end gap-2 mt-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
+            {t("btn.cancel")}
           </Button>
           <Button type="submit" disabled={f.busy}>
-            {f.busy ? "Saving…" : "Log audit"}
+            {f.busy ? t("btn.saving") : t("btn.logAudit")}
           </Button>
         </div>
       </form>
@@ -129,14 +132,15 @@ export function SafetyAuditModal({ open, onClose, tenantId, onDone }) {
 }
 
 export function FinanceModal({ open, onClose, tenantId, onDone }) {
+  const { t } = useI18n();
   const f = useForm({ invoice: "", amount: "", due: "", period: "" });
 
   async function submit(e) {
     e.preventDefault();
     const errs = {};
     const amount = Number(f.values.amount);
-    if (Number.isNaN(amount) || amount <= 0) errs.amount = "Enter a positive amount.";
-    if (!f.values.due) errs.due = "Due date is required.";
+    if (Number.isNaN(amount) || amount <= 0) errs.amount = t("err.amountPositive");
+    if (!f.values.due) errs.due = t("err.dueRequired");
     if (Object.keys(errs).length) return f.setErrors(errs);
 
     f.setBusy(true);
@@ -162,9 +166,9 @@ export function FinanceModal({ open, onClose, tenantId, onDone }) {
   }
 
   return (
-    <Modal open={open} title="New Finance Record" onClose={onClose}>
+    <Modal open={open} title={t("qa.newFinance")} onClose={onClose}>
       <form onSubmit={submit}>
-        <Field label="Invoice number">
+        <Field label={t("form.invoiceNumber")}>
           <input
             className={inputCls}
             value={f.values.invoice}
@@ -172,7 +176,7 @@ export function FinanceModal({ open, onClose, tenantId, onDone }) {
             placeholder="INV-2026-003"
           />
         </Field>
-        <Field label="Amount (₹)" error={f.errors.amount}>
+        <Field label={t("form.amount")} error={f.errors.amount}>
           <input
             type="number"
             className={inputCls}
@@ -180,7 +184,7 @@ export function FinanceModal({ open, onClose, tenantId, onDone }) {
             onChange={f.set("amount")}
           />
         </Field>
-        <Field label="Due date" error={f.errors.due}>
+        <Field label={t("form.dueDate")} error={f.errors.due}>
           <input
             type="date"
             className={inputCls}
@@ -188,7 +192,7 @@ export function FinanceModal({ open, onClose, tenantId, onDone }) {
             onChange={f.set("due")}
           />
         </Field>
-        <Field label="Filing period">
+        <Field label={t("form.filingPeriod")}>
           <input
             className={inputCls}
             value={f.values.period}
@@ -198,10 +202,10 @@ export function FinanceModal({ open, onClose, tenantId, onDone }) {
         </Field>
         <div className="flex justify-end gap-2 mt-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
+            {t("btn.cancel")}
           </Button>
           <Button type="submit" disabled={f.busy}>
-            {f.busy ? "Saving…" : "Create record"}
+            {f.busy ? t("btn.saving") : t("btn.createRecord")}
           </Button>
         </div>
       </form>
@@ -210,13 +214,14 @@ export function FinanceModal({ open, onClose, tenantId, onDone }) {
 }
 
 export function ContractModal({ open, onClose, tenantId, onDone }) {
+  const { t } = useI18n();
   const f = useForm({ title: "", expiry: "" });
 
   async function submit(e) {
     e.preventDefault();
     const errs = {};
-    if (!f.values.title.trim()) errs.title = "Contract title is required.";
-    if (!f.values.expiry) errs.expiry = "Expiry date is required.";
+    if (!f.values.title.trim()) errs.title = t("err.titleRequired");
+    if (!f.values.expiry) errs.expiry = t("err.expiryRequired");
     if (Object.keys(errs).length) return f.setErrors(errs);
 
     f.setBusy(true);
@@ -236,9 +241,9 @@ export function ContractModal({ open, onClose, tenantId, onDone }) {
   }
 
   return (
-    <Modal open={open} title="New Contract" onClose={onClose}>
+    <Modal open={open} title={t("qa.newContract")} onClose={onClose}>
       <form onSubmit={submit}>
-        <Field label="Title" error={f.errors.title}>
+        <Field label={t("form.title")} error={f.errors.title}>
           <input
             className={inputCls}
             value={f.values.title}
@@ -246,7 +251,7 @@ export function ContractModal({ open, onClose, tenantId, onDone }) {
             placeholder="Metro Line 3 — Civil Works"
           />
         </Field>
-        <Field label="Expiry date" error={f.errors.expiry}>
+        <Field label={t("form.expiryDate")} error={f.errors.expiry}>
           <input
             type="date"
             className={inputCls}
@@ -256,10 +261,10 @@ export function ContractModal({ open, onClose, tenantId, onDone }) {
         </Field>
         <div className="flex justify-end gap-2 mt-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
+            {t("btn.cancel")}
           </Button>
           <Button type="submit" disabled={f.busy}>
-            {f.busy ? "Saving…" : "Create contract"}
+            {f.busy ? t("btn.saving") : t("btn.createContract")}
           </Button>
         </div>
       </form>
