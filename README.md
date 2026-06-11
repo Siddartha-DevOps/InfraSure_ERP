@@ -97,6 +97,30 @@ All new operations are RBAC-gated per role and every mutation is audit-logged to
 - **React Native field app** (`apps/mobile`, Expo): login, geo-tagged DPRs, site photos,
   offline-first queue. See `apps/mobile/README.md` (scaffold — run locally with Expo).
 
+## Testing (resolver / security suite)
+
+The API ships a resolver-testing suite focused on the multi-tenant security model:
+
+```bash
+npm test --workspace apps/api              # unit suite (no DB needed)
+TEST_DATABASE_URL=postgresql://… \
+MONGO_URL=mongodb://… \
+  npm run test:integration --workspace apps/api   # end-to-end vs real datastores
+```
+
+What it covers (`apps/api/test/`):
+
+| Area | File | Needs DB? |
+|------|------|-----------|
+| **JWT injection** — claims round-trip, tampered tokens rejected | `auth.test.js` | no |
+| **Tenant isolation + RBAC** — mismatched `tenant_id` rejected, role matrix enforced | `authorize.test.js` | no |
+| **Audit logging** — `{tenant_id, user_id, action, timestamp}` persisted, fails soft | `audit.test.js` | no |
+| **Regression guard** — every non-public operation wires `authorize()` (a new module can't skip the check) | `rbac-coverage.test.js` | no |
+| **Positive path + cross-tenant rejection + audit persistence** end-to-end | `resolvers.integration.test.js` | yes (skips otherwise) |
+
+The integration suite is gated on `TEST_DATABASE_URL`, so the default `npm test` runs
+anywhere; point it at a throwaway database to exercise the full resolver paths.
+
 ## Contract document upload (REST)
 
 File uploads stay on REST (per the Phase 1 decision); everything else is GraphQL.
