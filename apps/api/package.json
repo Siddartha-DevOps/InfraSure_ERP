@@ -10,7 +10,9 @@
     "db:generate": "prisma generate --schema ../../packages/db/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema ../../packages/db/prisma/schema.prisma --name init",
     "db:seed": "node prisma/seed.js",
-    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed"
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed",
+    "test": "node --test test/authorize.test.js test/audit.test.js test/auth.test.js test/rbac-coverage.test.js",
+    "test:integration": "node --test test/resolvers.integration.test.js"
   },
   "dependencies": {
     "@apollo/server": "^4.11.0",

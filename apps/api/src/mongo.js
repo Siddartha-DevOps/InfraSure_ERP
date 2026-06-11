@@ -37,3 +37,9 @@ export async function writeAuditLog({ tenant_id, user_id, action, metadata }) {
 export async function closeMongo() {
   if (client) await client.close();
 }
+
+// Test/DI seam: inject a collection (e.g. a fake/in-memory one) so audit logging
+// can be observed without a live MongoDB. Pass null to reset.
+export function setAuditCollection(col) {
+  auditCollection = col;
+}
