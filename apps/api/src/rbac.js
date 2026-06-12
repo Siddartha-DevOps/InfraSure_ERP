@@ -17,6 +17,7 @@ export const PLATFORM_OPERATIONS = new Set([
 export const PERMISSIONS = {
   ENGINEER: [
     "getDashboardSummary",
+    "getAuditFeed",
     "getSafetyAudits",
     "getContracts",
     "getExpiringContracts",
@@ -33,6 +34,7 @@ export const PERMISSIONS = {
   ],
   ACCOUNTANT: [
     "getDashboardSummary",
+    "getAuditFeed",
     "getFinanceRecords",
     "getLabourFilings",
     "getComplianceKPIs",
