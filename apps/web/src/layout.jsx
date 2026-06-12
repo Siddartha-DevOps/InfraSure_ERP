@@ -1,6 +1,7 @@
 // App shell: left sidebar (modules + quick actions) and top bar (alerts, profile).
 import { useState } from "react";
 import { AlertsFeed } from "./ui.jsx";
+import { GlobalSearch } from "./widgets.jsx";
 import { useI18n, LANGUAGES } from "./i18n.jsx";
 
 const MODULE_ICON = {
@@ -77,19 +78,25 @@ export function Sidebar({ tabs, tab, setTab, quickActions }) {
   );
 }
 
-export function TopBar({ user, tenant, alerts, onLogout }) {
+export function TopBar({ user, tenant, alerts, onLogout, searchIndex = [], onSearchPick }) {
   const [open, setOpen] = useState(false);
   const { t: tr, lang, setLang } = useI18n();
   const critical = alerts.filter((a) => a.severity === "critical").length;
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
-      <div>
-        <p className="font-semibold text-gray-800">{tenant.company_name}</p>
+    <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-40">
+      <div className="hidden sm:block shrink-0">
+        <p className="font-semibold text-gray-800 leading-tight">{tenant.company_name}</p>
         <p className="text-xs text-neutral">{tr("top.workspace")}</p>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex-1 flex justify-center px-2">
+        {searchIndex.length > 0 && (
+          <GlobalSearch index={searchIndex} onPick={onSearchPick} />
+        )}
+      </div>
+
+      <div className="flex items-center gap-3 md:gap-4 shrink-0">
         <label className="sr-only" htmlFor="lang-select">
           Language
         </label>
