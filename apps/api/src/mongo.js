@@ -34,6 +34,31 @@ export async function writeAuditLog({ tenant_id, user_id, action, metadata }) {
   }
 }
 
+// Reads recent audit entries for the Audit Feed widget. Omit tenant_id for a
+// cross-tenant (platform) feed. Fails soft to an empty list if Mongo is down.
+export async function readAuditLogs({ tenant_id, limit = 15 } = {}) {
+  try {
+    const col = await connectMongo();
+    const filter = tenant_id ? { tenant_id } : {};
+    const docs = await col
+      .find(filter)
+      .sort({ timestamp: -1 })
+      .limit(Math.min(limit, 100))
+      .toArray();
+    return docs.map((d) => ({
+      tenant_id: d.tenant_id ?? null,
+      user_id: d.user_id ?? null,
+      action: d.action,
+      timestamp:
+        d.timestamp instanceof Date ? d.timestamp.toISOString() : d.timestamp,
+      metadata: d.metadata ? JSON.stringify(d.metadata) : null,
+    }));
+  } catch (err) {
+    console.error("[audit] failed to read logs:", err.message);
+    return [];
+  }
+}
+
 export async function closeMongo() {
   if (client) await client.close();
 }

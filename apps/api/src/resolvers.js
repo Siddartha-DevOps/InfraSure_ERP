@@ -4,7 +4,7 @@
 import { GraphQLError } from "graphql";
 import prisma from "@infrasure/db";
 import { authorize } from "./rbac.js";
-import { writeAuditLog } from "./mongo.js";
+import { writeAuditLog, readAuditLogs } from "./mongo.js";
 import {
   hashPassword,
   verifyPassword,
@@ -376,6 +376,141 @@ export const resolvers = {
         where: { tenant_id: args.tenant_id },
         orderBy: { created_at: "desc" },
       });
+    },
+
+    // ---- Dashboard role architecture ----
+    getContractors: async (_p, args, { user }) => {
+      authorize("getContractors", args, user);
+      return prisma.contractor.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { created_at: "desc" },
+      });
+    },
+
+    getAuditFeed: async (_p, args, { user }) => {
+      authorize("getAuditFeed", args, user);
+      return readAuditLogs({ tenant_id: args.tenant_id, limit: args.limit ?? 15 });
+    },
+
+    // Composite scores for the shared score widgets (compliance / risk / health).
+    getDashboardSummary: async (_p, args, { user }) => {
+      authorize("getDashboardSummary", args, user);
+      const where = { tenant_id: args.tenant_id };
+      const now = new Date();
+      const soon = new Date();
+      soon.setDate(soon.getDate() + 30);
+
+      const [finances, safety, labour, rera, disputes, contracts, vendors, steps] =
+        await Promise.all([
+          prisma.finance.findMany({ where }),
+          prisma.safety.findMany({ where }),
+          prisma.labourFiling.findMany({ where }),
+          prisma.reraFiling.findMany({ where }),
+          prisma.dispute.findMany({ where }),
+          prisma.contract.findMany({ where }),
+          prisma.vendor.findMany({ where }),
+          prisma.workflowStep.findMany({ where }),
+        ]);
+
+      const pct = (n, total) => (total === 0 ? 100 : (n / total) * 100);
+      const round = (x) => Math.round(x * 10) / 10;
+
+      // Compliance: average of the key filing/audit rates.
+      const compliance =
+        (pct(finances.filter((f) => f.gst_filing_status === "FILED").length, finances.length) +
+          pct(finances.filter((f) => f.tds_status === "FILED").length, finances.length) +
+          pct(safety.filter((s) => s.checklist_status === "COMPLETED").length, safety.length) +
+          pct(labour.filter((l) => l.status === "FILED").length, labour.length) +
+          pct(rera.filter((r) => r.status === "FILED" || r.status === "APPROVED").length, rera.length)) /
+        5;
+
+      const overdue = finances.filter((f) => !f.paid_date && new Date(f.due_date) < now).length;
+      const openDisputes = disputes.filter((d) => d.status !== "RESOLVED").length;
+      const escalated = disputes.filter((d) => d.status === "ESCALATED").length;
+      const pendingSteps = steps.filter((s) => s.status === "PENDING").length;
+      const expContracts = contracts.filter(
+        (c) => new Date(c.expiry_date) <= soon
+      ).length;
+      const expCerts = vendors.filter(
+        (v) => v.certification_expiry && new Date(v.certification_expiry) <= soon
+      ).length;
+
+      // Risk: weighted penalties (0 = no risk, 100 = max).
+      const risk = Math.min(
+        100,
+        overdue * 8 + escalated * 15 + openDisputes * 6 + expContracts * 4 + expCerts * 4 + (100 - compliance) * 0.3
+      );
+      const health = Math.max(0, compliance - risk * 0.4 - pendingSteps * 2);
+      const openAlerts = overdue + openDisputes + expContracts + expCerts;
+
+      return {
+        compliance_score: round(compliance),
+        risk_score: round(risk),
+        project_health_score: round(health),
+        open_alerts: openAlerts,
+        expiring_contracts: expContracts,
+        expiring_certificates: expCerts,
+      };
+    },
+
+    // ---- Platform (SUPER_ADMIN, cross-tenant) ----
+    getPlatformStats: async (_p, _args, { user }) => {
+      authorize("getPlatformStats", {}, user);
+      const TIER_MRR = { BASIC: 0, PRO: 4999, ENTERPRISE: 19999 };
+      const [tenants, users, contracts, subs, finances, disputes] =
+        await Promise.all([
+          prisma.tenant.findMany(),
+          prisma.user.count(),
+          prisma.contract.count(),
+          prisma.subscription.findMany(),
+          prisma.finance.findMany(),
+          prisma.dispute.findMany(),
+        ]);
+      const activeSubs = subs.filter((s) => s.status === "ACTIVE");
+      const mrr = activeSubs.reduce((a, s) => a + (TIER_MRR[s.plan_type] ?? 0), 0);
+      const filed = finances.filter(
+        (f) => f.gst_filing_status === "FILED"
+      ).length;
+      const avgCompliance =
+        finances.length === 0 ? 100 : (filed / finances.length) * 100;
+      return {
+        total_tenants: tenants.length,
+        total_users: users,
+        total_contracts: contracts,
+        active_subscriptions: activeSubs.length,
+        mrr_inr: mrr,
+        avg_compliance: Math.round(avgCompliance * 10) / 10,
+        open_disputes: disputes.filter((d) => d.status !== "RESOLVED").length,
+      };
+    },
+
+    getTenants: async (_p, _args, { user }) => {
+      authorize("getTenants", {}, user);
+      const tenants = await prisma.tenant.findMany({
+        include: { _count: { select: { users: true, contracts: true } } },
+        orderBy: { created_at: "asc" },
+      });
+      // Compute a simple compliance score per tenant from filed GST.
+      const finances = await prisma.finance.findMany();
+      return tenants.map((tn) => {
+        const tf = finances.filter((f) => f.tenant_id === tn.tenant_id);
+        const filed = tf.filter((f) => f.gst_filing_status === "FILED").length;
+        const score = tf.length === 0 ? 100 : Math.round((filed / tf.length) * 100);
+        return {
+          tenant_id: tn.tenant_id,
+          company_name: tn.company_name,
+          subscription_plan: tn.subscription_plan,
+          user_count: tn._count.users,
+          contract_count: tn._count.contracts,
+          compliance_score: score,
+          status: "ACTIVE",
+        };
+      });
+    },
+
+    getPlatformAuditFeed: async (_p, args, { user }) => {
+      authorize("getPlatformAuditFeed", {}, user);
+      return readAuditLogs({ limit: args.limit ?? 20 });
     },
   },
 
@@ -952,6 +1087,45 @@ export const resolvers = {
         metadata: { plan_type: args.plan_type, driver: session.driver },
       });
       return session;
+    },
+
+    // ---- Contractors ----
+    createContractor: async (_p, args, { user }) => {
+      authorize("createContractor", args, user);
+      const contractor = await prisma.contractor.create({
+        data: {
+          tenant_id: args.tenant_id,
+          name: args.name,
+          trade: args.trade ?? null,
+          contact_email: args.contact_email ?? null,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createContractor",
+        metadata: { contractor_id: contractor.contractor_id, name: contractor.name },
+      });
+      return contractor;
+    },
+
+    updateContractorStatus: async (_p, args, { user }) => {
+      authorize("updateContractorStatus", args, user);
+      const found = await prisma.contractor.findFirst({
+        where: { contractor_id: args.contractor_id, tenant_id: args.tenant_id },
+      });
+      if (!found) throw notFound("Contractor");
+      const contractor = await prisma.contractor.update({
+        where: { contractor_id: args.contractor_id },
+        data: { status: args.status },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "updateContractorStatus",
+        metadata: { contractor_id: args.contractor_id, status: args.status },
+      });
+      return contractor;
     },
 
     // ---- Sites (geo map) ----

@@ -24,6 +24,11 @@ async function main() {
     ["accountant@demo.test", "ACCOUNTANT"],
     ["officer@demo.test", "COMPLIANCE_OFFICER"],
     ["pm@demo.test", "PROJECT_MANAGER"],
+    // Dashboard role architecture
+    ["superadmin@demo.test", "SUPER_ADMIN"],
+    ["companyadmin@demo.test", "COMPANY_ADMIN"],
+    ["contractor@demo.test", "CONTRACTOR"],
+    ["vendor@demo.test", "VENDOR"],
   ];
 
   for (const [email, role] of roles) {
@@ -31,6 +36,29 @@ async function main() {
       data: { tenant_id: tenant.tenant_id, email, password_hash, role },
     });
   }
+
+  // Subcontractor registry (for Contractor management + dashboards).
+  await prisma.contractor.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        name: "Apex Civil Works",
+        trade: "Civil",
+        contact_email: "ops@apexcivil.test",
+        active_projects: 3,
+        compliance_score: 88,
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        name: "Volt Electrical Pvt Ltd",
+        trade: "Electrical",
+        contact_email: "pm@volt.test",
+        active_projects: 1,
+        compliance_score: 64,
+        status: "SUSPENDED",
+      },
+    ],
+  });
 
   await prisma.contract.create({
     data: {
@@ -226,7 +254,38 @@ async function main() {
     data: { tenant_id: tenant.tenant_id, name: "Approve RA Bill #1" },
   });
 
+  // A second tenant so the Super Admin platform view shows a real portfolio.
+  const tenant2 = await prisma.tenant.create({
+    data: {
+      company_name: "BuildWell Infra Ltd",
+      gst_number: "27BWELL5678K1Z3",
+      rera_id: "RERA-MH-2026-014",
+      subscription_plan: "ENTERPRISE",
+      subscriptions: { create: { plan_type: "ENTERPRISE" } },
+      users: {
+        create: {
+          email: "admin@buildwell.test",
+          password_hash,
+          role: "COMPANY_ADMIN",
+        },
+      },
+      contracts: {
+        create: [
+          { title: "Metro Line 5 — Viaduct", expiry_date: new Date("2028-03-31"), status: "ACTIVE" },
+          { title: "Airport Terminal Expansion", expiry_date: new Date("2027-09-30"), status: "ACTIVE" },
+        ],
+      },
+      finances: {
+        create: [
+          { amount: 9500000, due_date: new Date("2026-08-15"), gst_filing_status: "FILED", tds_status: "FILED", ra_bill_status: "APPROVED" },
+          { amount: 4200000, due_date: new Date("2026-07-01") },
+        ],
+      },
+    },
+  });
+
   console.log("✅ Seed complete.");
+  console.log(`   Tenant 2: ${tenant2.company_name} (${tenant2.tenant_id})`);
   console.log(`   Tenant: ${tenant.company_name} (${tenant.tenant_id})`);
   console.log(`   Login with any of these / password "${PASSWORD}":`);
   roles.forEach(([email, role]) => console.log(`     - ${email}  [${role}]`));

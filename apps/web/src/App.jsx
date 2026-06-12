@@ -9,8 +9,13 @@ import {
   EngineerHome,
   AccountantHome,
   OfficerHome,
-  PMHome,
 } from "./dashboards.jsx";
+import {
+  SuperAdminHome,
+  CompanyAdminHome,
+  ProjectManagerHome,
+  calendarEvents,
+} from "./roleDashboards.jsx";
 import {
   ComplianceModule,
   AuditModule,
@@ -34,6 +39,24 @@ import {
 
 // Role → sidebar modules ("home" is the role-specific dashboard).
 const NAV_BY_ROLE = {
+  SUPER_ADMIN: ["home"],
+  COMPANY_ADMIN: [
+    "home",
+    "compliance",
+    "audit",
+    "ai",
+    "contracts",
+    "finance",
+    "safety",
+    "environment",
+    "labour",
+    "rera",
+    "vendors",
+    "disputes",
+    "map",
+    "billing",
+    "integrations",
+  ],
   ADMIN: [
     "home",
     "compliance",
@@ -81,8 +104,13 @@ const NAV_BY_ROLE = {
   ENGINEER: ["home", "safety", "environment", "contracts", "ai", "map"],
 };
 
+// Platform datasets (SUPER_ADMIN only) are excluded from the tenant "all" set.
+const PLATFORM_DATASETS = new Set(["platformStats", "tenants", "platformAuditFeed"]);
+
 // Datasets each role's screens need (fetched once per reload).
 const DATASETS_BY_ROLE = {
+  SUPER_ADMIN: ["platformStats", "tenants", "platformAuditFeed"],
+  COMPANY_ADMIN: "all",
   ADMIN: "all",
   PROJECT_MANAGER: [
     "contracts",
@@ -99,6 +127,10 @@ const DATASETS_BY_ROLE = {
     "steps",
     "labour",
     "sites",
+    "dashboardSummary",
+    "contractors",
+    "auditFeed",
+    "users",
   ],
   COMPLIANCE_OFFICER: [
     "contracts",
@@ -148,6 +180,14 @@ const QUERIES = {
   integrations: `query($t:ID!){getIntegrationStatus(tenant_id:$t){integration configured driver}}`,
   subscription: `query($t:ID!){getSubscription(tenant_id:$t){plan_type billing_cycle status current_period_end}}`,
   tiers: `query{getBillingTiers{code name price_inr features}}`,
+  // Dashboard role architecture
+  dashboardSummary: `query($t:ID!){getDashboardSummary(tenant_id:$t){compliance_score risk_score project_health_score open_alerts expiring_contracts expiring_certificates}}`,
+  contractors: `query($t:ID!){getContractors(tenant_id:$t){contractor_id name trade contact_email active_projects compliance_score status}}`,
+  auditFeed: `query($t:ID!){getAuditFeed(tenant_id:$t,limit:15){tenant_id user_id action timestamp metadata}}`,
+  users: `query($t:ID!){getUsers(tenant_id:$t){user_id email role status}}`,
+  platformStats: `query{getPlatformStats{total_tenants total_users total_contracts active_subscriptions mrr_inr avg_compliance open_disputes}}`,
+  tenants: `query{getTenants{tenant_id company_name subscription_plan user_count contract_count compliance_score status}}`,
+  platformAuditFeed: `query{getPlatformAuditFeed(limit:20){tenant_id user_id action timestamp metadata}}`,
 };
 
 const FIELD_OF = {
@@ -169,6 +209,13 @@ const FIELD_OF = {
   integrations: "getIntegrationStatus",
   subscription: "getSubscription",
   tiers: "getBillingTiers",
+  dashboardSummary: "getDashboardSummary",
+  contractors: "getContractors",
+  auditFeed: "getAuditFeed",
+  users: "getUsers",
+  platformStats: "getPlatformStats",
+  tenants: "getTenants",
+  platformAuditFeed: "getPlatformAuditFeed",
 };
 
 const EMPTY = {
@@ -186,10 +233,17 @@ const EMPTY = {
   sites: [],
   integrations: [],
   tiers: [],
+  contractors: [],
+  auditFeed: [],
+  users: [],
+  tenants: [],
+  platformAuditFeed: [],
   kpis: null,
   audit: null,
   ai: null,
   subscription: null,
+  dashboardSummary: null,
+  platformStats: null,
 };
 
 function Login({ onLogin }) {
@@ -263,6 +317,7 @@ function Dashboard({ session, onLogout }) {
   const [tab, setTab] = useState("home");
   const [data, setData] = useState(EMPTY);
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [modal, setModal] = useState(null);
   const [checkout, setCheckout] = useState(null);
@@ -270,25 +325,31 @@ function Dashboard({ session, onLogout }) {
 
   const datasets =
     DATASETS_BY_ROLE[user.role] === "all"
-      ? Object.keys(QUERIES)
+      ? Object.keys(QUERIES).filter((k) => !PLATFORM_DATASETS.has(k))
       : DATASETS_BY_ROLE[user.role] || [];
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setErr("");
+      setLoading(true);
       const out = { ...EMPTY };
       await Promise.all(
         datasets.map(async (key) => {
           try {
-            const res = await gql(QUERIES[key], { t: user.tenant_id });
+            // Platform queries declare no $t variable.
+            const vars = QUERIES[key].includes("$t") ? { t: user.tenant_id } : {};
+            const res = await gql(QUERIES[key], vars);
             out[key] = res[FIELD_OF[key]] ?? EMPTY[key];
           } catch {
             out[key] = EMPTY[key]; // unauthorized/offline → keep fallback
           }
         })
       );
-      if (!cancelled) setData(out);
+      if (!cancelled) {
+        setData(out);
+        setLoading(false);
+      }
     }
     load();
     return () => {
@@ -298,6 +359,7 @@ function Dashboard({ session, onLogout }) {
 
   const refresh = () => setReload((n) => n + 1);
   const alerts = useMemo(() => buildAlerts(data, tr), [data, tr]);
+  const calendar = useMemo(() => calendarEvents(data), [data]);
   const canUpload = ["ADMIN", "PROJECT_MANAGER", "COMPLIANCE_OFFICER"].includes(
     user.role
   );
@@ -370,18 +432,24 @@ function Dashboard({ session, onLogout }) {
   }[user.role];
 
   const home =
-    user.role === "ENGINEER" ? (
+    user.role === "SUPER_ADMIN" ? (
+      <SuperAdminHome data={data} loading={loading} />
+    ) : user.role === "COMPANY_ADMIN" ? (
+      <CompanyAdminHome data={data} loading={loading} alerts={alerts} calendar={calendar} />
+    ) : user.role === "ENGINEER" ? (
       <EngineerHome data={data} />
     ) : user.role === "ACCOUNTANT" ? (
       <AccountantHome data={data} mutate={mutate} />
     ) : user.role === "COMPLIANCE_OFFICER" ? (
       <OfficerHome data={data} />
     ) : (
-      <PMHome
+      <ProjectManagerHome
         data={data}
+        loading={loading}
         alerts={alerts}
+        calendar={calendar}
         mutate={mutate}
-        canApprove={["ADMIN", "PROJECT_MANAGER"].includes(user.role)}
+        canApprove={["ADMIN", "PROJECT_MANAGER", "COMPANY_ADMIN"].includes(user.role)}
       />
     );
 

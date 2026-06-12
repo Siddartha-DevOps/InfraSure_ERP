@@ -131,6 +131,32 @@ Tokens live in `apps/web/tailwind.config.js`; components in `apps/web/src/ui.jsx
   focus-visible rings, and icon+text statuses (never color-only). Remaining known gap:
   AI-engine anomaly sentences arrive in English from the Python service.
 
+## Dashboard role architecture (Phase 1)
+
+Nine roles span platform, company, and external actors:
+
+| Tier | Roles | Scope |
+|------|-------|-------|
+| Platform | `SUPER_ADMIN` | **Cross-tenant** — platform stats, tenant portfolio, platform audit feed |
+| Company | `COMPANY_ADMIN`, `ADMIN` | Tenant-wide wildcard |
+| Internal | `PROJECT_MANAGER`, `SITE_ENGINEER`(=`ENGINEER`), `ACCOUNTANT`, `COMPLIANCE_OFFICER` | Module-scoped per RBAC |
+| External | `CONTRACTOR`, `VENDOR` | Own assignments / records |
+
+`SUPER_ADMIN` bypasses the tenant check (platform oversight); **platform operations
+(`getPlatformStats`, `getTenants`, `getPlatformAuditFeed`) are SUPER_ADMIN-only** — even a
+tenant-wildcard `COMPANY_ADMIN` is denied. All other roles keep strict tenant isolation.
+
+**Shared widget library** (`apps/web/src/widgets.jsx`, extends the existing Tailwind system):
+score gauges (Compliance / Risk / Project Health), donut charts, filterable data tables,
+audit feed, notifications center, mini calendar, tasks, global search, and loading / empty /
+error states. **Dashboards delivered:** Super Admin, Company Admin, Project Manager
+(`apps/web/src/roleDashboards.jsx`) — Site Engineer / Accountant / Compliance Officer
+(Phase 2) and Contractor / Vendor (Phase 3) to follow.
+
+New backend: `Contractor` model, `getDashboardSummary` (compliance/risk/health scores),
+`getContractors`, `getAuditFeed`, and the platform queries — all RBAC-gated and (for
+mutations) audit-logged. Seed adds a second tenant + a user per new role.
+
 ## Testing (resolver / security suite)
 
 The API ships a resolver-testing suite focused on the multi-tenant security model:
