@@ -321,6 +321,9 @@ export const typeDefs = /* GraphQL */ `
     # --- Dashboard role architecture ---
     getDashboardSummary(tenant_id: ID!): DashboardScores!
     getContractors(tenant_id: ID!): [Contractor!]!
+    # External-role self views (CONTRACTOR / VENDOR see only their own record)
+    getMyContractorProfile(tenant_id: ID!): Contractor
+    getMyVendorProfile(tenant_id: ID!): Vendor
     getAuditFeed(tenant_id: ID!, limit: Int = 15): [AuditEntry!]!
 
     # Platform-wide (SUPER_ADMIN only; cross-tenant)

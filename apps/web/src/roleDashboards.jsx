@@ -31,6 +31,8 @@ function calendarEvents(data) {
   for (const f of data.finance || [])
     if (!f.paid_date)
       ev.push({ date: f.due_date, label: `Payment: ${f.invoice_number || f.finance_id}`, severity: "warning" });
+  if (data.myVendor?.certification_expiry)
+    ev.push({ date: data.myVendor.certification_expiry, label: `Cert: ${data.myVendor.certification_name}`, severity: "critical" });
   return ev;
 }
 
