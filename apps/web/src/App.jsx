@@ -21,6 +21,7 @@ import {
   AccountantDashboard,
   ComplianceDashboard,
 } from "./roleDashboards2.jsx";
+import { ContractorHome, VendorHome } from "./roleDashboards3.jsx";
 import {
   ComplianceModule,
   AuditModule,
@@ -107,6 +108,8 @@ const NAV_BY_ROLE = {
   ],
   ACCOUNTANT: ["home", "compliance", "audit", "ai", "finance", "labour"],
   ENGINEER: ["home", "safety", "environment", "contracts", "ai", "map"],
+  CONTRACTOR: ["home", "contracts", "safety", "map"],
+  VENDOR: ["home", "contracts"],
 };
 
 // Platform datasets (SUPER_ADMIN only) are excluded from the tenant "all" set.
@@ -177,6 +180,16 @@ const DATASETS_BY_ROLE = {
     "dashboardSummary",
     "auditFeed",
   ],
+  CONTRACTOR: [
+    "myContractor",
+    "dashboardSummary",
+    "dprs",
+    "safety",
+    "sites",
+    "contracts",
+    "expiring",
+  ],
+  VENDOR: ["myVendor", "dashboardSummary", "contracts", "expiring"],
 };
 
 const QUERIES = {
@@ -206,6 +219,8 @@ const QUERIES = {
   platformStats: `query{getPlatformStats{total_tenants total_users total_contracts active_subscriptions mrr_inr avg_compliance open_disputes}}`,
   tenants: `query{getTenants{tenant_id company_name subscription_plan user_count contract_count compliance_score status}}`,
   platformAuditFeed: `query{getPlatformAuditFeed(limit:20){tenant_id user_id action timestamp metadata}}`,
+  myContractor: `query($t:ID!){getMyContractorProfile(tenant_id:$t){contractor_id name trade contact_email active_projects compliance_score status}}`,
+  myVendor: `query($t:ID!){getMyVendorProfile(tenant_id:$t){vendor_id name gst_number certification_name certification_expiry status}}`,
 };
 
 const FIELD_OF = {
@@ -234,6 +249,8 @@ const FIELD_OF = {
   platformStats: "getPlatformStats",
   tenants: "getTenants",
   platformAuditFeed: "getPlatformAuditFeed",
+  myContractor: "getMyContractorProfile",
+  myVendor: "getMyVendorProfile",
 };
 
 const EMPTY = {
@@ -262,6 +279,8 @@ const EMPTY = {
   subscription: null,
   dashboardSummary: null,
   platformStats: null,
+  myContractor: null,
+  myVendor: null,
 };
 
 function Login({ onLogin }) {
@@ -470,6 +489,8 @@ function Dashboard({ session, onLogout }) {
       { label: tr("qa.newFinance"), onClick: () => setModal("finance") },
     ],
     COMPLIANCE_OFFICER: [],
+    CONTRACTOR: [{ label: tr("qa.newDPR"), onClick: () => setModal("dpr") }],
+    VENDOR: [],
   }[user.role];
 
   const home =
@@ -483,6 +504,10 @@ function Dashboard({ session, onLogout }) {
       <AccountantDashboard data={data} loading={loading} errors={dataErrors} onRetry={refresh} alerts={alerts} calendar={calendar} mutate={mutate} />
     ) : user.role === "COMPLIANCE_OFFICER" ? (
       <ComplianceDashboard data={data} loading={loading} errors={dataErrors} onRetry={refresh} alerts={alerts} calendar={calendar} />
+    ) : user.role === "CONTRACTOR" ? (
+      <ContractorHome data={data} loading={loading} errors={dataErrors} onRetry={refresh} alerts={alerts} calendar={calendar} />
+    ) : user.role === "VENDOR" ? (
+      <VendorHome data={data} loading={loading} errors={dataErrors} onRetry={refresh} calendar={calendar} />
     ) : (
       <ProjectManagerHome
         data={data}

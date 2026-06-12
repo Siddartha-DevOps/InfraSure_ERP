@@ -387,6 +387,36 @@ export const resolvers = {
       });
     },
 
+    // External self-views: return only the caller's linked record (tenant-scoped).
+    getMyContractorProfile: async (_p, args, { user }) => {
+      authorize("getMyContractorProfile", args, user);
+      const dbUser = await prisma.user.findUnique({
+        where: { user_id: user.user_id },
+      });
+      if (dbUser?.linked_id) {
+        const c = await prisma.contractor.findFirst({
+          where: { contractor_id: dbUser.linked_id, tenant_id: args.tenant_id },
+        });
+        if (c) return c;
+      }
+      // Demo fallback when no explicit link exists.
+      return prisma.contractor.findFirst({ where: { tenant_id: args.tenant_id } });
+    },
+
+    getMyVendorProfile: async (_p, args, { user }) => {
+      authorize("getMyVendorProfile", args, user);
+      const dbUser = await prisma.user.findUnique({
+        where: { user_id: user.user_id },
+      });
+      if (dbUser?.linked_id) {
+        const v = await prisma.vendor.findFirst({
+          where: { vendor_id: dbUser.linked_id, tenant_id: args.tenant_id },
+        });
+        if (v) return v;
+      }
+      return prisma.vendor.findFirst({ where: { tenant_id: args.tenant_id } });
+    },
+
     getAuditFeed: async (_p, args, { user }) => {
       authorize("getAuditFeed", args, user);
       return readAuditLogs({ tenant_id: args.tenant_id, limit: args.limit ?? 15 });

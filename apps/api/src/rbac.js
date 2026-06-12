@@ -142,6 +142,7 @@ export const PERMISSIONS = {
   SUPER_ADMIN: ["*"],
   // External subcontractor: own assignments + field reporting.
   CONTRACTOR: [
+    "getMyContractorProfile",
     "getDashboardSummary",
     "getContracts",
     "getSites",
@@ -153,6 +154,7 @@ export const PERMISSIONS = {
   ],
   // External material/service vendor: own record + compliance docs.
   VENDOR: [
+    "getMyVendorProfile",
     "getDashboardSummary",
     "getVendors",
     "getExpiringCertifications",

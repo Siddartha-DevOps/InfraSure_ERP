@@ -149,9 +149,11 @@ tenant-wildcard `COMPANY_ADMIN` is denied. All other roles keep strict tenant is
 **Shared widget library** (`apps/web/src/widgets.jsx`, extends the existing Tailwind system):
 score gauges (Compliance / Risk / Project Health), donut charts, filterable data tables,
 audit feed, notifications center, mini calendar, tasks, global search, and loading / empty /
-error states. **Dashboards delivered:** Super Admin, Company Admin, Project Manager
-(`roleDashboards.jsx`) + Site Engineer, Accountant, Compliance Officer
-(`roleDashboards2.jsx`) — Contractor / Vendor (Phase 3) to follow.
+error states. **All 8 dashboards delivered:** Super Admin, Company Admin, Project Manager
+(`roleDashboards.jsx`); Site Engineer, Accountant, Compliance Officer
+(`roleDashboards2.jsx`); Contractor, Vendor (`roleDashboards3.jsx`). The external roles
+(Contractor/Vendor) get **scoped self-views** — `getMyContractorProfile` /
+`getMyVendorProfile` return only the caller's linked record (via `User.linked_id`).
 
 New backend: `Contractor` model, `getDashboardSummary` (compliance/risk/health scores),
 `getContractors`, `getAuditFeed`, and the platform queries — all RBAC-gated and (for

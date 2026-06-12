@@ -284,6 +284,24 @@ async function main() {
     },
   });
 
+  // Link the external demo users to their own Contractor / Vendor record.
+  const firstContractor = await prisma.contractor.findFirst({
+    where: { tenant_id: tenant.tenant_id },
+  });
+  const firstVendor = await prisma.vendor.findFirst({
+    where: { tenant_id: tenant.tenant_id },
+  });
+  if (firstContractor)
+    await prisma.user.update({
+      where: { email: "contractor@demo.test" },
+      data: { linked_id: firstContractor.contractor_id },
+    });
+  if (firstVendor)
+    await prisma.user.update({
+      where: { email: "vendor@demo.test" },
+      data: { linked_id: firstVendor.vendor_id },
+    });
+
   console.log("✅ Seed complete.");
   console.log(`   Tenant 2: ${tenant2.company_name} (${tenant2.tenant_id})`);
   console.log(`   Tenant: ${tenant.company_name} (${tenant.tenant_id})`);

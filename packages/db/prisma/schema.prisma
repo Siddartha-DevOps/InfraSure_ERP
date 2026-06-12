@@ -56,6 +56,8 @@ model User {
   password_hash String
   role          Role
   status        String    @default("ACTIVE")
+  // Links an external user (CONTRACTOR/VENDOR) to their Contractor/Vendor record.
+  linked_id     String?
   created_at    DateTime  @default(now())
   last_login    DateTime?
 
