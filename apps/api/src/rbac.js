@@ -6,8 +6,17 @@ import { GraphQLError } from "graphql";
 
 export const PUBLIC_OPERATIONS = new Set(["signupTenant", "login", "me"]);
 
+// Cross-tenant, platform-wide operations — exclusive to SUPER_ADMIN. Even a
+// tenant-wildcard COMPANY_ADMIN cannot reach these.
+export const PLATFORM_OPERATIONS = new Set([
+  "getPlatformStats",
+  "getTenants",
+  "getPlatformAuditFeed",
+]);
+
 export const PERMISSIONS = {
   ENGINEER: [
+    "getDashboardSummary",
     "getSafetyAudits",
     "getContracts",
     "getExpiringContracts",
@@ -23,6 +32,7 @@ export const PERMISSIONS = {
     "createDPR",
   ],
   ACCOUNTANT: [
+    "getDashboardSummary",
     "getFinanceRecords",
     "getLabourFilings",
     "getComplianceKPIs",
@@ -42,6 +52,9 @@ export const PERMISSIONS = {
     "fileGSTReturn",
   ],
   COMPLIANCE_OFFICER: [
+    "getDashboardSummary",
+    "getAuditFeed",
+    "getContractors",
     "getContracts",
     "getExpiringContracts",
     "getSafetyAudits",
@@ -80,6 +93,11 @@ export const PERMISSIONS = {
   PROJECT_MANAGER: [
     "getTenant",
     "getUsers",
+    "getDashboardSummary",
+    "getAuditFeed",
+    "getContractors",
+    "createContractor",
+    "updateContractorStatus",
     "getContracts",
     "getExpiringContracts",
     "getFinanceRecords",
@@ -116,17 +134,54 @@ export const PERMISSIONS = {
     "importBimModel",
   ],
   ADMIN: ["*"],
+  // Tenant-wide wildcard (same blast radius as ADMIN, scoped to one tenant).
+  COMPANY_ADMIN: ["*"],
+  // Platform owner — cross-tenant. authorize() handles it specially; "*" documents intent.
+  SUPER_ADMIN: ["*"],
+  // External subcontractor: own assignments + field reporting.
+  CONTRACTOR: [
+    "getDashboardSummary",
+    "getContracts",
+    "getSites",
+    "getDPRs",
+    "getSafetyAudits",
+    "getComplianceKPIs",
+    "getContractors",
+    "createDPR",
+  ],
+  // External material/service vendor: own record + compliance docs.
+  VENDOR: [
+    "getDashboardSummary",
+    "getVendors",
+    "getExpiringCertifications",
+    "getContracts",
+    "getBillingTiers",
+  ],
 };
 
 function unauthorized(message) {
   return new GraphQLError(message, { extensions: { code: "FORBIDDEN" } });
 }
 
-// Enforces: authenticated, tenant_id in args matches the token, role permits the op.
+// Enforces: authenticated, tenant isolation, and role permission for the operation.
+// SUPER_ADMIN is cross-tenant (platform oversight); platform ops are SUPER_ADMIN-only.
 export function authorize(operation, args, user) {
   if (!user) {
     throw unauthorized("Unauthorized: authentication required");
   }
+
+  // Platform-wide operations are exclusive to SUPER_ADMIN and skip the tenant check.
+  if (PLATFORM_OPERATIONS.has(operation)) {
+    if (user.role !== "SUPER_ADMIN") {
+      throw unauthorized(
+        `Unauthorized: role ${user.role} cannot perform ${operation}`
+      );
+    }
+    return;
+  }
+
+  // SUPER_ADMIN may read across tenants for platform oversight.
+  if (user.role === "SUPER_ADMIN") return;
 
   // Tenant isolation — the requested tenant_id must match the token.
   if (args?.tenant_id && args.tenant_id !== user.tenant_id) {
@@ -134,7 +189,7 @@ export function authorize(operation, args, user) {
   }
 
   const allowed = PERMISSIONS[user.role] || [];
-  if (user.role !== "ADMIN" && !allowed.includes(operation)) {
+  if (!allowed.includes("*") && !allowed.includes(operation)) {
     throw unauthorized(
       `Unauthorized: role ${user.role} cannot perform ${operation}`
     );

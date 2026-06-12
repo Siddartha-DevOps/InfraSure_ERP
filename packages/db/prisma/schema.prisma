@@ -16,6 +16,11 @@ enum Role {
   COMPLIANCE_OFFICER
   PROJECT_MANAGER
   ADMIN
+  // Platform/company/external roles (dashboard role architecture).
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  CONTRACTOR
+  VENDOR
 }
 
 model Tenant {
@@ -40,6 +45,7 @@ model Tenant {
   vendors       Vendor[]
   disputes      Dispute[]
   sites         Site[]
+  contractors   Contractor[]
   workflowSteps WorkflowStep[]
 }
 
@@ -223,6 +229,23 @@ model EnvironmentalReport {
   tenant_id   String
   report_data String
   created_at  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// Subcontractor registry (distinct from material Vendors) for the Contractor role.
+model Contractor {
+  contractor_id     String   @id @default(uuid())
+  tenant_id         String
+  name              String
+  trade             String? // e.g. "Civil", "Electrical", "Scaffolding"
+  contact_email     String?
+  active_projects   Int      @default(0)
+  compliance_score  Int      @default(100) // 0-100
+  status            String   @default("ACTIVE") // ACTIVE | SUSPENDED
+  created_at        DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 

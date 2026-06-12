@@ -86,7 +86,7 @@ test("RBAC: ADMIN wildcard can perform any operation", () => {
 
 test("RBAC matrix: every listed permission is allowed for its role", () => {
   for (const [role, ops] of Object.entries(PERMISSIONS)) {
-    if (role === "ADMIN") continue;
+    if (ops.includes("*")) continue; // wildcard roles handled separately
     for (const op of ops) {
       assert.doesNotThrow(
         () => authorize(op, { tenant_id: TENANT_A }, userOf(role)),
@@ -94,4 +94,53 @@ test("RBAC matrix: every listed permission is allowed for its role", () => {
       );
     }
   }
+});
+
+test("SUPER_ADMIN is cross-tenant (no tenant-mismatch rejection)", () => {
+  // Platform owner whose home tenant is A may still read tenant B.
+  assert.doesNotThrow(() =>
+    authorize("getContracts", { tenant_id: TENANT_B }, userOf("SUPER_ADMIN"))
+  );
+  assert.doesNotThrow(() =>
+    authorize("getDashboardSummary", { tenant_id: TENANT_B }, userOf("SUPER_ADMIN"))
+  );
+});
+
+test("platform operations are SUPER_ADMIN-only (even COMPANY_ADMIN is denied)", () => {
+  for (const role of ["ADMIN", "COMPANY_ADMIN", "PROJECT_MANAGER", "ENGINEER"]) {
+    assert.throws(
+      () => authorize("getPlatformStats", {}, userOf(role)),
+      /cannot perform getPlatformStats/,
+      `${role} must not access platform stats`
+    );
+  }
+  assert.doesNotThrow(() => authorize("getPlatformStats", {}, userOf("SUPER_ADMIN")));
+  assert.doesNotThrow(() => authorize("getTenants", {}, userOf("SUPER_ADMIN")));
+});
+
+test("COMPANY_ADMIN is a tenant-scoped wildcard but rejects cross-tenant", () => {
+  assert.doesNotThrow(() =>
+    authorize("changeSubscriptionPlan", { tenant_id: TENANT_A }, userOf("COMPANY_ADMIN"))
+  );
+  assert.throws(
+    () => authorize("getContracts", { tenant_id: TENANT_B }, userOf("COMPANY_ADMIN")),
+    /tenant mismatch/
+  );
+});
+
+test("CONTRACTOR / VENDOR are restricted to their allowed operations", () => {
+  assert.doesNotThrow(() =>
+    authorize("createDPR", { tenant_id: TENANT_A }, userOf("CONTRACTOR"))
+  );
+  assert.throws(
+    () => authorize("approveRABill", { tenant_id: TENANT_A }, userOf("CONTRACTOR")),
+    /cannot perform approveRABill/
+  );
+  assert.doesNotThrow(() =>
+    authorize("getExpiringCertifications", { tenant_id: TENANT_A }, userOf("VENDOR"))
+  );
+  assert.throws(
+    () => authorize("createContract", { tenant_id: TENANT_A }, userOf("VENDOR")),
+    /cannot perform createContract/
+  );
 });

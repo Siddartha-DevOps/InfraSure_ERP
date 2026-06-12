@@ -9,6 +9,10 @@ export const typeDefs = /* GraphQL */ `
     COMPLIANCE_OFFICER
     PROJECT_MANAGER
     ADMIN
+    SUPER_ADMIN
+    COMPANY_ADMIN
+    CONTRACTOR
+    VENDOR
   }
 
   type Tenant {
@@ -159,6 +163,60 @@ export const typeDefs = /* GraphQL */ `
     anomalies: [AIAnomaly!]!
   }
 
+  # ---- Dashboard role architecture (shared widgets + platform/company views) ----
+
+  type Contractor {
+    contractor_id: ID!
+    tenant_id: ID!
+    name: String!
+    trade: String
+    contact_email: String
+    active_projects: Int!
+    compliance_score: Int!
+    status: String!
+  }
+
+  # Composite scores powering the shared score widgets.
+  type DashboardScores {
+    compliance_score: Float! # 0-100, higher is better
+    risk_score: Float! # 0-100, higher is worse
+    project_health_score: Float! # 0-100, higher is better
+    open_alerts: Int!
+    expiring_contracts: Int!
+    expiring_certificates: Int!
+  }
+
+  # One immutable audit-log entry (from MongoDB) for the Audit Feed widget.
+  type AuditEntry {
+    tenant_id: ID
+    user_id: ID
+    action: String!
+    timestamp: String!
+    metadata: String
+  }
+
+  # Platform-wide rollup for the Super Admin dashboard (cross-tenant).
+  type PlatformStats {
+    total_tenants: Int!
+    total_users: Int!
+    total_contracts: Int!
+    active_subscriptions: Int!
+    mrr_inr: Int!
+    avg_compliance: Float!
+    open_disputes: Int!
+  }
+
+  # Per-tenant summary row for the Super Admin tenant table.
+  type TenantSummary {
+    tenant_id: ID!
+    company_name: String!
+    subscription_plan: String!
+    user_count: Int!
+    contract_count: Int!
+    compliance_score: Float!
+    status: String!
+  }
+
   # Geo-tagged project site for the compliance map.
   type Site {
     site_id: ID!
@@ -259,6 +317,16 @@ export const typeDefs = /* GraphQL */ `
     getDPRs(tenant_id: ID!): [Dpr!]!
     getWorkflowSteps(tenant_id: ID!): [WorkflowStep!]!
     getSites(tenant_id: ID!): [Site!]!
+
+    # --- Dashboard role architecture ---
+    getDashboardSummary(tenant_id: ID!): DashboardScores!
+    getContractors(tenant_id: ID!): [Contractor!]!
+    getAuditFeed(tenant_id: ID!, limit: Int = 15): [AuditEntry!]!
+
+    # Platform-wide (SUPER_ADMIN only; cross-tenant)
+    getPlatformStats: PlatformStats!
+    getTenants: [TenantSummary!]!
+    getPlatformAuditFeed(limit: Int = 20): [AuditEntry!]!
   }
 
   type Mutation {
@@ -353,6 +421,15 @@ export const typeDefs = /* GraphQL */ `
     # --- Phase 3: Billing ---
     changeSubscriptionPlan(tenant_id: ID!, plan_type: String!): Subscription!
     createBillingCheckout(tenant_id: ID!, plan_type: String!): CheckoutSession!
+
+    # --- Contractors ---
+    createContractor(
+      tenant_id: ID!
+      name: String!
+      trade: String
+      contact_email: String
+    ): Contractor!
+    updateContractorStatus(tenant_id: ID!, contractor_id: ID!, status: String!): Contractor!
 
     # --- Sites (geo map) ---
     createSite(
