@@ -150,8 +150,8 @@ tenant-wildcard `COMPANY_ADMIN` is denied. All other roles keep strict tenant is
 score gauges (Compliance / Risk / Project Health), donut charts, filterable data tables,
 audit feed, notifications center, mini calendar, tasks, global search, and loading / empty /
 error states. **Dashboards delivered:** Super Admin, Company Admin, Project Manager
-(`apps/web/src/roleDashboards.jsx`) — Site Engineer / Accountant / Compliance Officer
-(Phase 2) and Contractor / Vendor (Phase 3) to follow.
+(`roleDashboards.jsx`) + Site Engineer, Accountant, Compliance Officer
+(`roleDashboards2.jsx`) — Contractor / Vendor (Phase 3) to follow.
 
 New backend: `Contractor` model, `getDashboardSummary` (compliance/risk/health scores),
 `getContractors`, `getAuditFeed`, and the platform queries — all RBAC-gated and (for

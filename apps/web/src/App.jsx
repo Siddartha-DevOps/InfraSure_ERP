@@ -17,6 +17,11 @@ import {
   calendarEvents,
 } from "./roleDashboards.jsx";
 import {
+  SiteEngineerHome,
+  AccountantDashboard,
+  ComplianceDashboard,
+} from "./roleDashboards2.jsx";
+import {
   ComplianceModule,
   AuditModule,
   AIModule,
@@ -146,8 +151,19 @@ const DATASETS_BY_ROLE = {
     "ai",
     "steps",
     "sites",
+    "dashboardSummary",
+    "auditFeed",
+    "contractors",
   ],
-  ACCOUNTANT: ["finance", "labour", "kpis", "audit", "ai"],
+  ACCOUNTANT: [
+    "finance",
+    "labour",
+    "kpis",
+    "audit",
+    "ai",
+    "dashboardSummary",
+    "auditFeed",
+  ],
   ENGINEER: [
     "contracts",
     "expiring",
@@ -158,6 +174,8 @@ const DATASETS_BY_ROLE = {
     "dprs",
     "steps",
     "sites",
+    "dashboardSummary",
+    "auditFeed",
   ],
 };
 
@@ -460,11 +478,11 @@ function Dashboard({ session, onLogout }) {
     ) : user.role === "COMPANY_ADMIN" ? (
       <CompanyAdminHome data={data} loading={loading} errors={dataErrors} onRetry={refresh} alerts={alerts} calendar={calendar} />
     ) : user.role === "ENGINEER" ? (
-      <EngineerHome data={data} />
+      <SiteEngineerHome data={data} loading={loading} errors={dataErrors} onRetry={refresh} alerts={alerts} calendar={calendar} />
     ) : user.role === "ACCOUNTANT" ? (
-      <AccountantHome data={data} mutate={mutate} />
+      <AccountantDashboard data={data} loading={loading} errors={dataErrors} onRetry={refresh} alerts={alerts} calendar={calendar} mutate={mutate} />
     ) : user.role === "COMPLIANCE_OFFICER" ? (
-      <OfficerHome data={data} />
+      <ComplianceDashboard data={data} loading={loading} errors={dataErrors} onRetry={refresh} alerts={alerts} calendar={calendar} />
     ) : (
       <ProjectManagerHome
         data={data}
