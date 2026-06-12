@@ -42,6 +42,14 @@ export function EmptyState({ icon = "📭", title, hint }) {
   );
 }
 
+// Standardizes the loading → error → empty → content lifecycle for a card body.
+export function Section({ loading, error, empty, onRetry, skeleton, children }) {
+  if (loading) return skeleton || <LoadingSkeleton />;
+  if (error) return <ErrorState onRetry={onRetry} />;
+  if (empty) return empty;
+  return children;
+}
+
 export function ErrorState({ message, onRetry }) {
   const { t } = useI18n();
   return (

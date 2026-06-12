@@ -317,6 +317,7 @@ function Dashboard({ session, onLogout }) {
   const [tab, setTab] = useState("home");
   const [data, setData] = useState(EMPTY);
   const [err, setErr] = useState("");
+  const [dataErrors, setDataErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [modal, setModal] = useState(null);
@@ -334,6 +335,7 @@ function Dashboard({ session, onLogout }) {
       setErr("");
       setLoading(true);
       const out = { ...EMPTY };
+      const errs = {};
       await Promise.all(
         datasets.map(async (key) => {
           try {
@@ -342,12 +344,14 @@ function Dashboard({ session, onLogout }) {
             const res = await gql(QUERIES[key], vars);
             out[key] = res[FIELD_OF[key]] ?? EMPTY[key];
           } catch {
-            out[key] = EMPTY[key]; // unauthorized/offline → keep fallback
+            out[key] = EMPTY[key]; // keep fallback; flag so the card can show an error state
+            errs[key] = true;
           }
         })
       );
       if (!cancelled) {
         setData(out);
+        setDataErrors(errs);
         setLoading(false);
       }
     }
@@ -360,6 +364,25 @@ function Dashboard({ session, onLogout }) {
   const refresh = () => setReload((n) => n + 1);
   const alerts = useMemo(() => buildAlerts(data, tr), [data, tr]);
   const calendar = useMemo(() => calendarEvents(data), [data]);
+
+  // Global search index over loaded records → jump to the owning module.
+  const searchIndex = useMemo(() => {
+    const idx = [];
+    const add = (rows, type, label, tab) =>
+      (rows || []).forEach((r) => idx.push({ type, label: label(r), tab }));
+    add(data.contracts, "Contract", (c) => c.title, "contracts");
+    add(data.vendors, "Vendor", (v) => v.name, "vendors");
+    add(data.sites, "Site", (s) => s.name, "map");
+    add(data.contractors, "Contractor", (c) => c.name, "home");
+    add(data.disputes, "Dispute", (d) => d.title, "disputes");
+    add(data.rera, "RERA", (r) => r.project_name, "rera");
+    add(data.tenants, "Tenant", (tn) => tn.company_name, "home");
+    return idx;
+  }, [data]);
+
+  const onSearchPick = (item) => {
+    if (tabs.includes(item.tab)) setTab(item.tab);
+  };
   const canUpload = ["ADMIN", "PROJECT_MANAGER", "COMPLIANCE_OFFICER"].includes(
     user.role
   );
@@ -433,9 +456,9 @@ function Dashboard({ session, onLogout }) {
 
   const home =
     user.role === "SUPER_ADMIN" ? (
-      <SuperAdminHome data={data} loading={loading} />
+      <SuperAdminHome data={data} loading={loading} errors={dataErrors} onRetry={refresh} />
     ) : user.role === "COMPANY_ADMIN" ? (
-      <CompanyAdminHome data={data} loading={loading} alerts={alerts} calendar={calendar} />
+      <CompanyAdminHome data={data} loading={loading} errors={dataErrors} onRetry={refresh} alerts={alerts} calendar={calendar} />
     ) : user.role === "ENGINEER" ? (
       <EngineerHome data={data} />
     ) : user.role === "ACCOUNTANT" ? (
@@ -446,6 +469,8 @@ function Dashboard({ session, onLogout }) {
       <ProjectManagerHome
         data={data}
         loading={loading}
+        errors={dataErrors}
+        onRetry={refresh}
         alerts={alerts}
         calendar={calendar}
         mutate={mutate}
@@ -464,7 +489,14 @@ function Dashboard({ session, onLogout }) {
       <Sidebar tabs={tabs} tab={tab} setTab={setTab} quickActions={quickActions} />
 
       <div className="flex-1 min-w-0">
-        <TopBar user={user} tenant={tenant} alerts={alerts} onLogout={onLogout} />
+        <TopBar
+          user={user}
+          tenant={tenant}
+          alerts={alerts}
+          onLogout={onLogout}
+          searchIndex={searchIndex}
+          onSearchPick={onSearchPick}
+        />
 
         <main id="main" className="p-6 grid gap-5 md:grid-cols-2" aria-live="polite">
           {err && (
