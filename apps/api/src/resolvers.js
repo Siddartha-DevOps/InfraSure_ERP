@@ -378,6 +378,30 @@ export const resolvers = {
       });
     },
 
+    // ---- Reports & analytics ----
+    getComplianceTrend: async (_p, args, { user }) => {
+      authorize("getComplianceTrend", args, user);
+      const finances = await prisma.finance.findMany({
+        where: { tenant_id: args.tenant_id },
+      });
+      // Last 6 months, by due month: % of that month's records with GST filed.
+      const months = [];
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const inMonth = finances.filter(
+          (f) => (f.due_date?.toISOString?.() || "").slice(0, 7) === key
+        );
+        const filed = inMonth.filter((f) => f.gst_filing_status === "FILED").length;
+        months.push({
+          label: key.slice(5),
+          value: inMonth.length === 0 ? 0 : Math.round((filed / inMonth.length) * 100),
+        });
+      }
+      return months;
+    },
+
     // ---- Dashboard role architecture ----
     getContractors: async (_p, args, { user }) => {
       authorize("getContractors", args, user);

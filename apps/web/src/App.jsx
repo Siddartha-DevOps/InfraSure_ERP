@@ -22,6 +22,7 @@ import {
   ComplianceDashboard,
 } from "./roleDashboards2.jsx";
 import { ContractorHome, VendorHome } from "./roleDashboards3.jsx";
+import { ReportsModule, ApprovalsModule } from "./reports.jsx";
 import {
   ComplianceModule,
   AuditModule,
@@ -60,6 +61,8 @@ const NAV_BY_ROLE = {
     "vendors",
     "disputes",
     "map",
+    "reports",
+    "approvals",
     "billing",
     "integrations",
   ],
@@ -77,6 +80,8 @@ const NAV_BY_ROLE = {
     "vendors",
     "disputes",
     "map",
+    "reports",
+    "approvals",
     "billing",
     "integrations",
   ],
@@ -91,6 +96,8 @@ const NAV_BY_ROLE = {
     "vendors",
     "disputes",
     "map",
+    "reports",
+    "approvals",
   ],
   COMPLIANCE_OFFICER: [
     "home",
@@ -105,8 +112,10 @@ const NAV_BY_ROLE = {
     "vendors",
     "disputes",
     "map",
+    "reports",
+    "approvals",
   ],
-  ACCOUNTANT: ["home", "compliance", "audit", "ai", "finance", "labour"],
+  ACCOUNTANT: ["home", "compliance", "audit", "ai", "finance", "labour", "reports", "approvals"],
   ENGINEER: ["home", "safety", "environment", "contracts", "ai", "map"],
   CONTRACTOR: ["home", "contracts", "safety", "map"],
   VENDOR: ["home", "contracts"],
@@ -139,6 +148,7 @@ const DATASETS_BY_ROLE = {
     "contractors",
     "auditFeed",
     "users",
+    "trend",
   ],
   COMPLIANCE_OFFICER: [
     "contracts",
@@ -157,6 +167,7 @@ const DATASETS_BY_ROLE = {
     "dashboardSummary",
     "auditFeed",
     "contractors",
+    "trend",
   ],
   ACCOUNTANT: [
     "finance",
@@ -166,6 +177,9 @@ const DATASETS_BY_ROLE = {
     "ai",
     "dashboardSummary",
     "auditFeed",
+    "trend",
+    "steps",
+    "rera",
   ],
   ENGINEER: [
     "contracts",
@@ -220,6 +234,7 @@ const QUERIES = {
   tenants: `query{getTenants{tenant_id company_name subscription_plan user_count contract_count compliance_score status}}`,
   platformAuditFeed: `query{getPlatformAuditFeed(limit:20){tenant_id user_id action timestamp metadata}}`,
   myContractor: `query($t:ID!){getMyContractorProfile(tenant_id:$t){contractor_id name trade contact_email active_projects compliance_score status}}`,
+  trend: `query($t:ID!){getComplianceTrend(tenant_id:$t){label value}}`,
   myVendor: `query($t:ID!){getMyVendorProfile(tenant_id:$t){vendor_id name gst_number certification_name certification_expiry status}}`,
 };
 
@@ -251,6 +266,7 @@ const FIELD_OF = {
   platformAuditFeed: "getPlatformAuditFeed",
   myContractor: "getMyContractorProfile",
   myVendor: "getMyVendorProfile",
+  trend: "getComplianceTrend",
 };
 
 const EMPTY = {
@@ -281,6 +297,7 @@ const EMPTY = {
   platformStats: null,
   myContractor: null,
   myVendor: null,
+  trend: [],
 };
 
 function Login({ onLogin }) {
@@ -399,7 +416,7 @@ function Dashboard({ session, onLogout }) {
   }, [user.tenant_id, user.role, reload]);
 
   const refresh = () => setReload((n) => n + 1);
-  const alerts = useMemo(() => buildAlerts(data, tr), [data, tr]);
+  const alerts = useMemo(() => buildAlerts(data, tr, mutate, user.role), [data, tr]);
   const calendar = useMemo(() => calendarEvents(data), [data]);
 
   // Global search index over loaded records → jump to the owning module.
@@ -539,6 +556,7 @@ function Dashboard({ session, onLogout }) {
           onLogout={onLogout}
           searchIndex={searchIndex}
           onSearchPick={onSearchPick}
+          auditFeed={data.auditFeed}
         />
 
         <main id="main" className="p-6 grid gap-5 md:grid-cols-2" aria-live="polite">
@@ -551,6 +569,8 @@ function Dashboard({ session, onLogout }) {
           {tab === "home" && home}
           {tab === "map" && <ProjectMap sites={data.sites} />}
           {tab === "compliance" && <ComplianceModule data={data} />}
+          {tab === "reports" && <ReportsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} />}
+          {tab === "approvals" && <ApprovalsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} mutate={mutate} role={user.role} />}
           {tab === "audit" && <AuditModule data={data} />}
           {tab === "ai" && <AIModule data={data} />}
           {tab === "contracts" && (
