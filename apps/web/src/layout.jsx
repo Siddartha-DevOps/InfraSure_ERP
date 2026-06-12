@@ -1,7 +1,7 @@
 // App shell: left sidebar (modules + quick actions) and top bar (alerts, profile).
 import { useState } from "react";
 import { AlertsFeed } from "./ui.jsx";
-import { GlobalSearch } from "./widgets.jsx";
+import { GlobalSearch, AuditFeed } from "./widgets.jsx";
 import { useI18n, LANGUAGES } from "./i18n.jsx";
 
 const MODULE_ICON = {
@@ -20,6 +20,8 @@ const MODULE_ICON = {
   billing: "💳",
   integrations: "🔌",
   map: "🗺️",
+  reports: "📈",
+  approvals: "🗳️",
 };
 
 export function Sidebar({ tabs, tab, setTab, quickActions }) {
@@ -78,8 +80,9 @@ export function Sidebar({ tabs, tab, setTab, quickActions }) {
   );
 }
 
-export function TopBar({ user, tenant, alerts, onLogout, searchIndex = [], onSearchPick }) {
+export function TopBar({ user, tenant, alerts, onLogout, searchIndex = [], onSearchPick, auditFeed = [] }) {
   const [open, setOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const { t: tr, lang, setLang } = useI18n();
   const critical = alerts.filter((a) => a.severity === "critical").length;
 
@@ -113,6 +116,25 @@ export function TopBar({ user, tenant, alerts, onLogout, searchIndex = [], onSea
             </option>
           ))}
         </select>
+        {auditFeed.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setAuditOpen((o) => !o)}
+              aria-label={tr("audit.logs")}
+              aria-expanded={auditOpen}
+              className="text-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded p-1"
+            >
+              📋
+            </button>
+            {auditOpen && (
+              <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-gray-200 p-4 z-50">
+                <h4 className="font-semibold text-gray-800 mb-3">{tr("audit.logs")}</h4>
+                <AuditFeed entries={auditFeed} />
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="relative">
           <button
             onClick={() => setOpen((o) => !o)}

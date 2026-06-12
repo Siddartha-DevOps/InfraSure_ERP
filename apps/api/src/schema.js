@@ -176,6 +176,12 @@ export const typeDefs = /* GraphQL */ `
     status: String!
   }
 
+  # One point on a time-series chart (e.g. monthly compliance trend).
+  type TrendPoint {
+    label: String!
+    value: Float!
+  }
+
   # Composite scores powering the shared score widgets.
   type DashboardScores {
     compliance_score: Float! # 0-100, higher is better
@@ -320,6 +326,8 @@ export const typeDefs = /* GraphQL */ `
 
     # --- Dashboard role architecture ---
     getDashboardSummary(tenant_id: ID!): DashboardScores!
+    # 6-month compliance trend (filing rate per month) for the Reports module.
+    getComplianceTrend(tenant_id: ID!): [TrendPoint!]!
     getContractors(tenant_id: ID!): [Contractor!]!
     # External-role self views (CONTRACTOR / VENDOR see only their own record)
     getMyContractorProfile(tenant_id: ID!): Contractor

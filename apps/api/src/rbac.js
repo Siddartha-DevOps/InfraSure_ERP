@@ -34,6 +34,7 @@ export const PERMISSIONS = {
   ],
   ACCOUNTANT: [
     "getDashboardSummary",
+    "getComplianceTrend",
     "getAuditFeed",
     "getFinanceRecords",
     "getLabourFilings",
@@ -55,6 +56,7 @@ export const PERMISSIONS = {
   ],
   COMPLIANCE_OFFICER: [
     "getDashboardSummary",
+    "getComplianceTrend",
     "getAuditFeed",
     "getContractors",
     "getContracts",
@@ -96,6 +98,7 @@ export const PERMISSIONS = {
     "getTenant",
     "getUsers",
     "getDashboardSummary",
+    "getComplianceTrend",
     "getAuditFeed",
     "getContractors",
     "createContractor",

@@ -255,6 +255,14 @@ export function NotificationsCenter({ alerts = [] }) {
           <div>
             <span className="text-gray-700">{a.text}</span>
             <span className="text-neutral text-xs ml-1">· {a.module}</span>
+            {a.onAction && (
+              <button
+                onClick={a.onAction}
+                className="ml-2 text-xs text-primary underline font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+              >
+                {a.actionLabel}
+              </button>
+            )}
           </div>
         </li>
       ))}
