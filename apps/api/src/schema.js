@@ -302,6 +302,18 @@ export const typeDefs = /* GraphQL */ `
     audit_readiness_score: Float!
   }
 
+  # A system-generated compliance reminder (created by the daily scheduler).
+  type Reminder {
+    reminder_id: ID!
+    tenant_id: ID!
+    kind: String!
+    message: String!
+    due_date: String
+    ref_id: ID
+    status: String!
+    created_at: String!
+  }
+
   # Aggregated audit document-retrieval timing (how fast packs/docs are produced).
   type RetrievalMetrics {
     count: Int!
@@ -389,6 +401,8 @@ export const typeDefs = /* GraphQL */ `
     getAuditReadinessTrend(tenant_id: ID!, limit: Int = 12): [ReadinessSnapshot!]!
     # Avg/p95 document-retrieval timing over the window (audit retrieval KPI).
     getRetrievalMetrics(tenant_id: ID!, withinDays: Int = 30): RetrievalMetrics!
+    # Pending scheduler-generated reminders (e.g. GST due tomorrow), soonest first.
+    getReminders(tenant_id: ID!): [Reminder!]!
 
     # --- Phase 4 ---
     getAIInsights(tenant_id: ID!): AIInsights!
@@ -518,6 +532,11 @@ export const typeDefs = /* GraphQL */ `
     captureAuditReadinessSnapshot(tenant_id: ID!): ReadinessSnapshot!
     # Record one document-retrieval timing (e.g. Compliance Pack produced in N ms).
     recordRetrieval(tenant_id: ID!, kind: String!, duration_ms: Int!, label: String): RetrievalMetrics!
+    # Run the daily reminder scan for this tenant on demand (returns count created).
+    # The same logic runs automatically via the cron scheduler.
+    runDailyReminders(tenant_id: ID!): Int!
+    # Dismiss a reminder once actioned.
+    dismissReminder(tenant_id: ID!, reminder_id: ID!): Reminder!
 
     # --- Phase 3: Vendors ---
     createVendor(

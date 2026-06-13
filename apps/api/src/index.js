@@ -15,6 +15,7 @@ import { getUserFromAuthHeader } from "./auth.js";
 import { authorize } from "./rbac.js";
 import { connectMongo, writeAuditLog } from "./mongo.js";
 import { storeFile, storageConfig } from "./storage.js";
+import { runDailyJobs } from "./scheduler.js";
 
 const PORT = process.env.PORT || 4000;
 
@@ -116,6 +117,21 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`🚀 InfraSure API ready at http://localhost:${PORT}/graphql`);
   });
+
+  // Optional in-process scheduler for long-lived hosts (e.g. Render). Serverless
+  // deployments should instead invoke `npm run scheduler` from an external cron.
+  // Set SCHEDULER_INTERVAL_MS (e.g. 86400000 for daily) to enable.
+  const intervalMs = Number(process.env.SCHEDULER_INTERVAL_MS || 0);
+  if (intervalMs > 0) {
+    const tick = () =>
+      runDailyJobs(prisma, { writeAuditLog })
+        .then((s) =>
+          console.log(`[scheduler] created ${s.created} reminder(s) across ${s.tenants} tenant(s).`)
+        )
+        .catch((err) => console.error("[scheduler] run failed:", err.message));
+    tick();
+    setInterval(tick, intervalMs);
+  }
 }
 
 start().catch((err) => {

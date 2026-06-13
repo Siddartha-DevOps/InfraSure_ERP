@@ -84,6 +84,13 @@ All new operations are RBAC-gated per role and every mutation is audit-logged to
   `captureAuditReadinessSnapshot` (idempotent per day, audit-logged) appends a point — a
   daily scheduler/cron calls it in production, or Compliance/PM capture one manually via the
   **Capture snapshot** button. Seed includes 6 monthly snapshots so the trend renders.
+- **Daily compliance scheduler:** `src/scheduler.js` scans every tenant for **GST filings
+  due tomorrow** and creates proactive `Reminder` records (idempotent per day). Run it from
+  an external cron — `npm run scheduler --workspace apps/api` (system cron / GitHub Actions
+  cron / Render Cron Job / Vercel Cron) — or set `SCHEDULER_INTERVAL_MS` to run it in-process
+  on long-lived hosts. The Reports module shows pending reminders with a **Dismiss** action
+  and a **Run reminders now** button (`getReminders` / `runDailyReminders` / `dismissReminder`).
+  Pure selection helpers are unit-tested (`test/scheduler.test.js`).
 - **Document-retrieval-time KPI:** `RetrievalEvent` records how fast each evidence pack /
   export / document is produced; the Reports module instruments its export actions
   (`recordRetrieval`) and surfaces real **avg / p95 / count** via `getRetrievalMetrics` —

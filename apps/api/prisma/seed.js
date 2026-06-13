@@ -101,6 +101,11 @@ async function main() {
   });
 
   // --- Financial Compliance (mix of filed/pending + an overdue unpaid bill) ---
+  // Tomorrow (00:00) so the GST-due-tomorrow scheduler has a live target.
+  const dueTomorrow = new Date();
+  dueTomorrow.setHours(0, 0, 0, 0);
+  dueTomorrow.setDate(dueTomorrow.getDate() + 1);
+
   await prisma.finance.createMany({
     data: [
       {
@@ -124,7 +129,28 @@ async function main() {
         tds_status: "PENDING",
         ra_bill_status: "PENDING",
       },
+      {
+        tenant_id: tenant.tenant_id,
+        invoice_number: "INV-2026-003",
+        filing_period: "2026-Q2",
+        amount: 640000,
+        due_date: dueTomorrow, // GST due tomorrow → scheduler reminder target
+        gst_filing_status: "PENDING",
+        tds_status: "PENDING",
+        ra_bill_status: "PENDING",
+      },
     ],
+  });
+
+  // A pre-generated reminder (the daily scheduler creates these in production).
+  await prisma.reminder.create({
+    data: {
+      tenant_id: tenant.tenant_id,
+      kind: "GST_DUE",
+      message: "GST filing due tomorrow for invoice INV-2026-003 (₹6,40,000).",
+      due_date: dueTomorrow,
+      ref_id: "INV-2026-003",
+    },
   });
 
   // --- Safety & Environment ---

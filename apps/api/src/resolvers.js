@@ -12,6 +12,7 @@ import {
 } from "./auth.js";
 import { listTiers, createCheckoutSession, isValidPlan } from "./billing.js";
 import { extractGeoFromReport, isSameSite } from "./geo.js";
+import { runTenantReminders } from "./scheduler.js";
 import { getInsights } from "./ai.js";
 import {
   integrationStatus,
@@ -152,6 +153,10 @@ export const resolvers = {
   Subscription: { current_period_end: (s) => iso(s.current_period_end) },
   ReadinessSnapshot: { captured_at: (s) => iso(s.captured_at) },
   RetrievalMetrics: { last_retrieved: (m) => iso(m.last_retrieved) },
+  Reminder: {
+    due_date: (r) => iso(r.due_date),
+    created_at: (r) => iso(r.created_at),
+  },
 
   Query: {
     me: async (_p, _a, { user }) => {
@@ -423,6 +428,14 @@ export const resolvers = {
     getRetrievalMetrics: async (_p, args, { user }) => {
       authorize("getRetrievalMetrics", args, user);
       return computeRetrievalMetrics(args.tenant_id, args.withinDays ?? 30);
+    },
+
+    getReminders: async (_p, args, { user }) => {
+      authorize("getReminders", args, user);
+      return prisma.reminder.findMany({
+        where: { tenant_id: args.tenant_id, status: "PENDING" },
+        orderBy: { due_date: "asc" },
+      });
     },
 
     // ---- Phase 4: AI insights ----
@@ -1280,6 +1293,46 @@ export const resolvers = {
         },
       });
       return computeRetrievalMetrics(args.tenant_id, 30);
+    },
+
+    runDailyReminders: async (_p, args, { user }) => {
+      authorize("runDailyReminders", args, user);
+      const finances = await prisma.finance.findMany({
+        where: { tenant_id: args.tenant_id },
+      });
+      const created = await runTenantReminders(
+        prisma,
+        args.tenant_id,
+        finances
+      );
+      if (created > 0) {
+        await writeAuditLog({
+          tenant_id: args.tenant_id,
+          user_id: user.user_id,
+          action: "runDailyReminders",
+          metadata: { created },
+        });
+      }
+      return created;
+    },
+
+    dismissReminder: async (_p, args, { user }) => {
+      authorize("dismissReminder", args, user);
+      const existing = await prisma.reminder.findFirst({
+        where: { reminder_id: args.reminder_id, tenant_id: args.tenant_id },
+      });
+      if (!existing) throw notFound("Reminder");
+      const reminder = await prisma.reminder.update({
+        where: { reminder_id: args.reminder_id },
+        data: { status: "DISMISSED" },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "dismissReminder",
+        metadata: { reminder_id: reminder.reminder_id },
+      });
+      return reminder;
     },
 
     // ---- Phase 3: Vendors ----
