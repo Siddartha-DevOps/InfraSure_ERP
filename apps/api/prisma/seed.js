@@ -60,13 +60,44 @@ async function main() {
     ],
   });
 
-  await prisma.contract.create({
-    data: {
-      tenant_id: tenant.tenant_id,
-      title: "Highway Phase II — Main Works Contract",
-      expiry_date: new Date("2027-03-31"),
-      status: "ACTIVE",
-    },
+  // Projects (group contracts + sites for the compliance roll-up).
+  const projHighway = await prisma.project.create({
+    data: { tenant_id: tenant.tenant_id, code: "PRJ-001", name: "Highway Phase II", location: "Bengaluru" },
+  });
+  const projSkyline = await prisma.project.create({
+    data: { tenant_id: tenant.tenant_id, code: "PRJ-002", name: "Skyline Residency", location: "Hyderabad" },
+  });
+  const projCoastal = await prisma.project.create({
+    data: { tenant_id: tenant.tenant_id, code: "PRJ-003", name: "Coastal Embankment", location: "Chennai" },
+  });
+
+  await prisma.contract.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projHighway.project_id,
+        title: "Highway Phase II — Main Works Contract",
+        contract_type: "WORK_ORDER",
+        expiry_date: new Date("2027-03-31"),
+        status: "ACTIVE",
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projSkyline.project_id,
+        title: "Skyline — Builder's All-Risk Insurance",
+        contract_type: "INSURANCE",
+        expiry_date: new Date("2026-07-10"), // expiring soon → PENDING
+        status: "ACTIVE",
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projCoastal.project_id,
+        title: "Coastal Embankment — Master Agreement",
+        contract_type: "AGREEMENT",
+        expiry_date: new Date("2026-05-31"), // expired → NON_COMPLIANT
+        status: "ACTIVE",
+      },
+    ],
   });
 
   // --- Financial Compliance (mix of filed/pending + an overdue unpaid bill) ---
@@ -228,6 +259,7 @@ async function main() {
     data: [
       {
         tenant_id: tenant.tenant_id,
+        project_id: projHighway.project_id,
         name: "Highway Phase II — Site A",
         latitude: 12.9716,
         longitude: 77.5946, // Bengaluru
@@ -235,6 +267,7 @@ async function main() {
       },
       {
         tenant_id: tenant.tenant_id,
+        project_id: projSkyline.project_id,
         name: "Skyline Residency — Tower B",
         latitude: 17.385,
         longitude: 78.4867, // Hyderabad
@@ -242,6 +275,7 @@ async function main() {
       },
       {
         tenant_id: tenant.tenant_id,
+        project_id: projCoastal.project_id,
         name: "Coastal Embankment Works",
         latitude: 13.0827,
         longitude: 80.2707, // Chennai

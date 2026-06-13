@@ -215,7 +215,7 @@ export function FinanceModal({ open, onClose, tenantId, onDone }) {
 
 export function ContractModal({ open, onClose, tenantId, onDone }) {
   const { t } = useI18n();
-  const f = useForm({ title: "", expiry: "" });
+  const f = useForm({ title: "", expiry: "", type: "AGREEMENT" });
 
   async function submit(e) {
     e.preventDefault();
@@ -227,8 +227,8 @@ export function ContractModal({ open, onClose, tenantId, onDone }) {
     f.setBusy(true);
     try {
       await gql(
-        `mutation($t:ID!,$title:String!,$e:String!){createContract(tenant_id:$t,title:$title,expiry_date:$e){contract_id}}`,
-        { t: tenantId, title: f.values.title.trim(), e: f.values.expiry }
+        `mutation($t:ID!,$title:String!,$e:String!,$ct:String){createContract(tenant_id:$t,title:$title,expiry_date:$e,contract_type:$ct){contract_id}}`,
+        { t: tenantId, title: f.values.title.trim(), e: f.values.expiry, ct: f.values.type }
       );
       f.setErrors({});
       onDone();
@@ -251,6 +251,14 @@ export function ContractModal({ open, onClose, tenantId, onDone }) {
             placeholder="Metro Line 3 — Civil Works"
           />
         </Field>
+        <Field label={t("form.contractType")}>
+          <select className={inputCls} value={f.values.type} onChange={f.set("type")}>
+            <option value="AGREEMENT">{t("ctype.AGREEMENT")}</option>
+            <option value="WORK_ORDER">{t("ctype.WORK_ORDER")}</option>
+            <option value="INSURANCE">{t("ctype.INSURANCE")}</option>
+            <option value="OTHER">{t("ctype.OTHER")}</option>
+          </select>
+        </Field>
         <Field label={t("form.expiryDate")} error={f.errors.expiry}>
           <input
             type="date"
@@ -265,6 +273,58 @@ export function ContractModal({ open, onClose, tenantId, onDone }) {
           </Button>
           <Button type="submit" disabled={f.busy}>
             {f.busy ? t("btn.saving") : t("btn.createContract")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function ProjectModal({ open, onClose, tenantId, onDone }) {
+  const { t } = useI18n();
+  const f = useForm({ code: "", name: "", location: "" });
+
+  async function submit(e) {
+    e.preventDefault();
+    const errs = {};
+    if (!f.values.code.trim()) errs.code = t("err.codeRequired");
+    if (!f.values.name.trim()) errs.name = t("err.nameRequired");
+    if (Object.keys(errs).length) return f.setErrors(errs);
+
+    f.setBusy(true);
+    try {
+      await gql(
+        `mutation($t:ID!,$c:String!,$n:String!,$l:String){createProject(tenant_id:$t,code:$c,name:$n,location:$l){project_id}}`,
+        { t: tenantId, c: f.values.code.trim(), n: f.values.name.trim(), l: f.values.location || null }
+      );
+      f.setErrors({});
+      onDone();
+      onClose();
+    } catch (err) {
+      f.setErrors({ code: err.message });
+    } finally {
+      f.setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={open} title={t("qa.newProject")} onClose={onClose}>
+      <form onSubmit={submit}>
+        <Field label={t("form.projectCode")} error={f.errors.code}>
+          <input className={inputCls} value={f.values.code} onChange={f.set("code")} placeholder="PRJ-004" />
+        </Field>
+        <Field label={t("form.projectName")} error={f.errors.name}>
+          <input className={inputCls} value={f.values.name} onChange={f.set("name")} placeholder="Riverside Bridge" />
+        </Field>
+        <Field label={t("form.projectLocation")}>
+          <input className={inputCls} value={f.values.location} onChange={f.set("location")} placeholder="Pune" />
+        </Field>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("btn.cancel")}
+          </Button>
+          <Button type="submit" disabled={f.busy}>
+            {f.busy ? t("btn.saving") : t("btn.createProject")}
           </Button>
         </div>
       </form>

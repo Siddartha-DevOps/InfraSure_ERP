@@ -74,6 +74,44 @@ export const resolvers = {
       return prisma.contract.findMany({ where: { tenant_id: args.tenant_id } });
     },
 
+    // Projects with a 🟢/🟡/🔴 compliance roll-up from their contracts + sites.
+    getProjects: async (_p, args, { user }) => {
+      authorize("getProjects", args, user);
+      const [projects, contracts, sites] = await Promise.all([
+        prisma.project.findMany({
+          where: { tenant_id: args.tenant_id },
+          orderBy: { created_at: "asc" },
+        }),
+        prisma.contract.findMany({ where: { tenant_id: args.tenant_id } }),
+        prisma.site.findMany({ where: { tenant_id: args.tenant_id } }),
+      ]);
+      const now = new Date();
+      const soon = new Date();
+      soon.setDate(soon.getDate() + 30);
+
+      return projects.map((p) => {
+        const pc = contracts.filter((c) => c.project_id === p.project_id);
+        const ps = sites.filter((s) => s.project_id === p.project_id);
+        const nonCompliant =
+          pc.some((c) => new Date(c.expiry_date) < now) ||
+          ps.some((s) => s.status === "NON_COMPLIANT");
+        const pending =
+          pc.some((c) => new Date(c.expiry_date) <= soon) ||
+          ps.some((s) => s.status === "PENDING");
+        const compliance_status = nonCompliant
+          ? "NON_COMPLIANT"
+          : pending
+          ? "PENDING"
+          : "COMPLIANT";
+        return {
+          ...p,
+          contract_count: pc.length,
+          site_count: ps.length,
+          compliance_status,
+        };
+      });
+    },
+
     // Expiry alerts: contracts whose expiry_date falls within the next N days
     // (defaults to 30), soonest first. Excludes already-expired by default? No —
     // include from now forward so imminent + just-lapsed both surface.
@@ -621,6 +659,26 @@ export const resolvers = {
       return { token: signToken(user), user, tenant };
     },
 
+    // ---- Projects ----
+    createProject: async (_p, args, { user }) => {
+      authorize("createProject", args, user);
+      const project = await prisma.project.create({
+        data: {
+          tenant_id: args.tenant_id,
+          code: args.code,
+          name: args.name,
+          location: args.location ?? null,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createProject",
+        metadata: { project_id: project.project_id, code: project.code },
+      });
+      return project;
+    },
+
     // ---- Contracts ----
     createContract: async (_p, args, { user }) => {
       authorize("createContract", args, user);
@@ -629,6 +687,8 @@ export const resolvers = {
           tenant_id: args.tenant_id,
           title: args.title,
           expiry_date: new Date(args.expiry_date),
+          contract_type: args.contract_type ?? "AGREEMENT",
+          project_id: args.project_id ?? null,
         },
       });
       await writeAuditLog({
