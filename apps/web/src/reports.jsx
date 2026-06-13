@@ -8,12 +8,13 @@ import {
   Section,
 } from "./widgets.jsx";
 import { downloadCsv } from "./export.js";
+import { openCompliancePack } from "./pdf.js";
 import { useI18n } from "./i18n.jsx";
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const day = (iso) => (iso || "").slice(0, 10);
 
-export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, role }) {
+export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, role, tenant }) {
   const { t } = useI18n();
   const fin = data.finance || [];
   const gstFiled = fin.filter((f) => f.gst_filing_status === "FILED").length;
@@ -65,6 +66,9 @@ export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, rol
       { header: "Status", value: (r) => r.checklist_status },
       { header: "PPE%", value: (r) => r.ppe_compliance },
     ]);
+  }
+  function exportPdf() {
+    openCompliancePack(data, { t, company: tenant?.company_name });
   }
 
   return (
@@ -135,12 +139,13 @@ export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, rol
 
       <Card title={t("rep.export")} wide>
         <div className="flex flex-wrap gap-3">
+          <Button onClick={exportPdf}>🗎 {t("rep.exportPdf")}</Button>
           <Button variant="secondary" onClick={exportContracts}>⬇ {t("rep.exportContracts")}</Button>
           <Button variant="secondary" onClick={exportFinance}>⬇ {t("rep.exportFinance")}</Button>
           <Button variant="secondary" onClick={exportSafety}>⬇ {t("rep.exportSafety")}</Button>
           <Button variant="secondary" onClick={exportAudit}>⬇ {t("rep.exportAudit")}</Button>
         </div>
-        <p className="text-xs text-neutral mt-3">RERA / GST / labour exports as CSV for external audits.</p>
+        <p className="text-xs text-neutral mt-3">{t("rep.exportHint")}</p>
       </Card>
     </>
   );
