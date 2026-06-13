@@ -94,8 +94,57 @@ export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, rol
     );
   }
 
+  const reminders = data.reminders || [];
+
   return (
     <>
+      <Card
+        title={t("rem.title")}
+        wide
+        action={
+          canCapture ? (
+            <Button
+              variant="secondary"
+              onClick={() =>
+                mutate(`mutation($t:ID!){runDailyReminders(tenant_id:$t)}`, {})
+              }
+            >
+              🔄 {t("rem.runNow")}
+            </Button>
+          ) : null
+        }
+      >
+        <Section loading={loading} error={errors.reminders} onRetry={onRetry}>
+          {reminders.length ? (
+            <ul className="divide-y divide-gray-100">
+              {reminders.map((r) => (
+                <li key={r.reminder_id} className="flex items-center justify-between py-2 text-sm">
+                  <span>
+                    <span className="text-warning-text mr-2" aria-hidden="true">⏰</span>
+                    {r.message}
+                  </span>
+                  {mutate && (
+                    <button
+                      onClick={() =>
+                        mutate(
+                          `mutation($t:ID!,$id:ID!){dismissReminder(tenant_id:$t,reminder_id:$id){reminder_id}}`,
+                          { id: r.reminder_id }
+                        )
+                      }
+                      className="text-primary underline text-xs whitespace-nowrap ml-3"
+                    >
+                      {t("rem.dismiss")}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon="✅" title={t("rem.empty")} />
+          )}
+        </Section>
+      </Card>
+
       <Card title={t("rep.gstPie")}>
         <Section loading={loading} error={errors.finance} onRetry={onRetry}>
           <DonutChart

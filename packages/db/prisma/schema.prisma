@@ -52,6 +52,7 @@ model Tenant {
   clearances    Clearance[]
   readinessSnapshots ReadinessSnapshot[]
   retrievalEvents    RetrievalEvent[]
+  reminders          Reminder[]
 }
 
 model User {
@@ -208,6 +209,23 @@ model ReadinessSnapshot {
   open_disputes          Int      @default(0)
   vendor_compliance_rate Float    @default(0)
   captured_at            DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// System-generated compliance reminders (created by the daily scheduler).
+// e.g. "GST filing due tomorrow" — proactive, before the deadline lapses.
+model Reminder {
+  reminder_id String    @id @default(uuid())
+  tenant_id   String
+  kind        String    @default("GST_DUE") // GST_DUE | CLEARANCE_EXPIRY | CONTRACT_EXPIRY
+  message     String
+  due_date    DateTime?
+  ref_id      String? // source record id (finance_id / clearance_id …)
+  status      String    @default("PENDING") // PENDING | DISMISSED
+  created_at  DateTime  @default(now())
 
   tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 
