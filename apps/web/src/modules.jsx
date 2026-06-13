@@ -279,7 +279,20 @@ export function LabourModule({ data, canAct, mutate }) {
               <td>₹{Number(l.amount).toLocaleString("en-IN")}</td>
               <td><StatusPill value={l.status} /></td>
               {canAct && (
-                <td>
+                <td className="space-x-3 whitespace-nowrap">
+                  {(l.filing_type === "PF" || l.filing_type === "ESI") && l.status !== "FILED" && (
+                    <button
+                      onClick={() =>
+                        mutate(
+                          `mutation($t:ID!,$id:ID!){fileEPFOReturn(tenant_id:$t,labour_id:$id){status detail driver reference}}`,
+                          { id: l.labour_id }
+                        )
+                      }
+                      className="text-primary underline text-xs"
+                    >
+                      {t("btn.efileEpfo")}
+                    </button>
+                  )}
                   {l.status !== "FILED" && (
                     <button
                       onClick={() =>

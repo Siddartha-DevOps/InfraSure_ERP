@@ -111,10 +111,13 @@ All new operations are RBAC-gated per role and every mutation is audit-logged to
   predictive compliance scoring + OCR stub. Exposed via `getAIInsights`, which degrades
   gracefully if the engine is offline. Run it with `docker compose up ai-engine` or
   `uvicorn main:app` (see `services/ai-engine`).
-- **External integrations** (`apps/api/src/integrations`): Tally/SAP, GST portal, RERA,
-  Aadhaar e-sign, BIM — stub-by-default adapters, "live" once each credential is set.
-  `getIntegrationStatus` + `syncTallyLedger` / `fileGSTReturn` / `syncReraUpdates` /
-  `requestAadhaarESign` / `importBimModel`.
+- **External integrations** (`apps/api/src/integrations`): Tally/SAP, GSTN, **EPFO**, RERA,
+  Aadhaar e-sign, BIM. Stub-by-default; once an integration's credential env is set it makes
+  a **real HTTP call** via a resilient client (`httpJson`) with timeouts, exponential-backoff
+  retries on 5xx/429/network errors, and uniform error mapping (a failing portal returns an
+  `ERROR` result, never a 500). `getIntegrationStatus` + `syncTallyLedger` / `fileGSTReturn` /
+  `fileEPFOReturn` / `syncReraUpdates` / `requestAadhaarESign` / `importBimModel`. The HTTP
+  client + adapters are unit-tested (`test/integrations.test.js`).
 - **React Native field app** (`apps/mobile`, Expo): login, geo-tagged DPRs, site photos,
   offline-first queue. See `apps/mobile/README.md` (scaffold — run locally with Expo).
 
