@@ -24,59 +24,76 @@ const MODULE_ICON = {
   approvals: "🗳️",
 };
 
-export function Sidebar({ tabs, tab, setTab, quickActions }) {
+// Quick-actions dropdown for the top tab bar (replaces the sidebar's action list).
+function QuickActionsMenu({ quickActions }) {
   const { t: tr } = useI18n();
+  const [open, setOpen] = useState(false);
   return (
-    <aside
-      className="w-60 shrink-0 bg-primary text-white min-h-screen flex flex-col"
-      aria-label="Module navigation"
-    >
-      <div className="px-5 py-5 border-b border-white/10">
-        <p className="font-bold text-lg leading-tight">InfraSure ERP</p>
-        <p className="text-xs text-white/60">{tr("app.tagline")}</p>
-      </div>
-
-      <nav className="flex-1 py-3" aria-label="Modules">
-        {tabs.map((t) => {
-          const m = { label: tr(`nav.${t}`), icon: MODULE_ICON[t] || "▫️" };
-          const active = tab === t;
-          return (
+    <div className="relative shrink-0 pl-2">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="bg-success text-white rounded-lg px-3 py-1.5 text-sm font-medium hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary whitespace-nowrap"
+      >
+        ＋ {tr("qa.title")}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 p-2 z-50"
+        >
+          {quickActions.map((qa) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              aria-current={active ? "page" : undefined}
-              className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
-                active
-                  ? "bg-white/15 font-semibold border-l-4 border-success pl-4"
-                  : "text-white/80 hover:bg-white/10"
-              }`}
+              key={qa.label}
+              role="menuitem"
+              onClick={() => {
+                qa.onClick();
+                setOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-sm text-gray-800 rounded-lg hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <span aria-hidden="true">{m.icon}</span>
-              {m.label}
+              + {qa.label}
             </button>
-          );
-        })}
-      </nav>
-
-      {quickActions?.length > 0 && (
-        <div className="px-5 py-4 border-t border-white/10">
-          <p className="text-xs uppercase tracking-wide text-white/50 mb-2">
-            {tr("qa.title")}
-          </p>
-          <div className="space-y-2">
-            {quickActions.map((qa) => (
-              <button
-                key={qa.label}
-                onClick={qa.onClick}
-                className="w-full bg-success text-white rounded-lg px-3 py-2 text-sm font-medium hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-              >
-                + {qa.label}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       )}
-    </aside>
+    </div>
+  );
+}
+
+// Primary navigation: a horizontal tab bar under the header (replaces the sidebar).
+export function TopTabs({ tabs, tab, setTab, quickActions }) {
+  const { t: tr } = useI18n();
+  return (
+    <nav className="bg-white border-b border-gray-200" aria-label="Modules">
+      <div className="flex items-center px-2 md:px-4">
+        <div className="flex-1 flex items-center gap-0.5 overflow-x-auto" role="tablist">
+          {tabs.map((t) => {
+            const m = { label: tr(`nav.${t}`), icon: MODULE_ICON[t] || "▫️" };
+            const active = tab === t;
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                role="tab"
+                aria-selected={active}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-1.5 px-3 py-3 text-sm whitespace-nowrap border-b-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  active
+                    ? "border-primary text-primary font-semibold"
+                    : "border-transparent text-neutral hover:text-gray-800 hover:border-gray-300"
+                }`}
+              >
+                <span aria-hidden="true">{m.icon}</span>
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+        {quickActions?.length > 0 && <QuickActionsMenu quickActions={quickActions} />}
+      </div>
+    </nav>
   );
 }
 
@@ -87,10 +104,13 @@ export function TopBar({ user, tenant, alerts, onLogout, searchIndex = [], onSea
   const critical = alerts.filter((a) => a.severity === "critical").length;
 
   return (
-    <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-40">
-      <div className="hidden sm:block shrink-0">
-        <p className="font-semibold text-gray-800 leading-tight">{tenant.company_name}</p>
-        <p className="text-xs text-neutral">{tr("top.workspace")}</p>
+    <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex items-center gap-3">
+      <div className="shrink-0 flex items-center gap-3">
+        <p className="font-bold text-primary text-lg leading-none hidden sm:block">InfraSure</p>
+        <div className="hidden md:block border-l border-gray-200 pl-3">
+          <p className="font-semibold text-gray-800 leading-tight">{tenant.company_name}</p>
+          <p className="text-xs text-neutral">{tr("top.workspace")}</p>
+        </div>
       </div>
 
       <div className="flex-1 flex justify-center px-2">
