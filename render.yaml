@@ -37,7 +37,12 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
+      # Seed a demo tenant + the 8 role logins on first boot (idempotent).
+      # Set to "false" (or remove) once you've created your own tenant via signup.
+      - key: SEED_ON_START
+        value: "true"
       # Create a MongoDB Atlas cluster and paste its connection string here.
+      # Optional — audit logging degrades gracefully if unset.
       - key: MONGO_URL
         sync: false
       # Optional: set to the AI engine's public URL to enable AI insights.

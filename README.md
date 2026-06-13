@@ -260,6 +260,9 @@ S3 later, implement the `s3` branch in `apps/api/src/storage.js` — callers are
 
 ## Deploying
 
+> **Full step-by-step guide:** [DEPLOY.md](DEPLOY.md) — backend API + Postgres on Render,
+> then the frontend on Vercel (and what `VITE_API_URL` is). Start there.
+
 ### Web app (Vercel)
 
 This is an npm-workspaces monorepo, so Vercel needs to know where the web app is.
