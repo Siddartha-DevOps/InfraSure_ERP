@@ -302,6 +302,15 @@ export const typeDefs = /* GraphQL */ `
     audit_readiness_score: Float!
   }
 
+  # Aggregated audit document-retrieval timing (how fast packs/docs are produced).
+  type RetrievalMetrics {
+    count: Int!
+    avg_seconds: Float!
+    p95_seconds: Float!
+    fastest_seconds: Float!
+    last_retrieved: String
+  }
+
   # A point-in-time audit-readiness snapshot for the historical trend chart.
   type ReadinessSnapshot {
     snapshot_id: ID!
@@ -378,6 +387,8 @@ export const typeDefs = /* GraphQL */ `
     getAuditReadiness(tenant_id: ID!): AuditReadiness!
     # Historical audit-readiness snapshots (oldest→newest) for the trend chart.
     getAuditReadinessTrend(tenant_id: ID!, limit: Int = 12): [ReadinessSnapshot!]!
+    # Avg/p95 document-retrieval timing over the window (audit retrieval KPI).
+    getRetrievalMetrics(tenant_id: ID!, withinDays: Int = 30): RetrievalMetrics!
 
     # --- Phase 4 ---
     getAIInsights(tenant_id: ID!): AIInsights!
@@ -505,6 +516,8 @@ export const typeDefs = /* GraphQL */ `
     # Capture the current audit-readiness as a snapshot (idempotent per day).
     # A daily scheduler calls this; can also be triggered manually.
     captureAuditReadinessSnapshot(tenant_id: ID!): ReadinessSnapshot!
+    # Record one document-retrieval timing (e.g. Compliance Pack produced in N ms).
+    recordRetrieval(tenant_id: ID!, kind: String!, duration_ms: Int!, label: String): RetrievalMetrics!
 
     # --- Phase 3: Vendors ---
     createVendor(

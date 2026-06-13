@@ -84,6 +84,10 @@ All new operations are RBAC-gated per role and every mutation is audit-logged to
   `captureAuditReadinessSnapshot` (idempotent per day, audit-logged) appends a point — a
   daily scheduler/cron calls it in production, or Compliance/PM capture one manually via the
   **Capture snapshot** button. Seed includes 6 monthly snapshots so the trend renders.
+- **Document-retrieval-time KPI:** `RetrievalEvent` records how fast each evidence pack /
+  export / document is produced; the Reports module instruments its export actions
+  (`recordRetrieval`) and surfaces real **avg / p95 / count** via `getRetrievalMetrics` —
+  the audit "how fast can you produce a document" metric, no longer a placeholder.
 - **Exports:** the Reports module exports per-domain **CSV** (contracts / finance / safety /
   audit log) plus a one-click **Compliance Pack PDF** (`src/pdf.js`) — a print-optimized
   evidence pack (readiness score + trend + compliance KPIs + contract/clearance/incident/

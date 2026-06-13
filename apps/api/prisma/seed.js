@@ -383,6 +383,17 @@ async function main() {
     })),
   });
 
+  // --- Document-retrieval timings (audit retrieval KPI) ---
+  await prisma.retrievalEvent.createMany({
+    data: [
+      { tenant_id: tenant.tenant_id, kind: "PACK", label: "Compliance Pack", duration_ms: 420 },
+      { tenant_id: tenant.tenant_id, kind: "EXPORT", label: "contracts.csv", duration_ms: 180 },
+      { tenant_id: tenant.tenant_id, kind: "PACK", label: "Compliance Pack", duration_ms: 510 },
+      { tenant_id: tenant.tenant_id, kind: "EXPORT", label: "finance.csv", duration_ms: 240 },
+      { tenant_id: tenant.tenant_id, kind: "DOCUMENT", label: "Contract PDF", duration_ms: 1320 },
+    ],
+  });
+
   // A second tenant so the Super Admin platform view shows a real portfolio.
   const tenant2 = await prisma.tenant.create({
     data: {
