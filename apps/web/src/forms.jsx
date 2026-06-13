@@ -280,6 +280,101 @@ export function ContractModal({ open, onClose, tenantId, onDone }) {
   );
 }
 
+export function IncidentModal({ open, onClose, tenantId, onDone }) {
+  const { t } = useI18n();
+  const f = useForm({
+    title: "",
+    category: "OTHER",
+    severity: "LOW",
+    site: "",
+    description: "",
+  });
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!f.values.title.trim())
+      return f.setErrors({ title: t("err.titleRequired") });
+    f.setBusy(true);
+    try {
+      await gql(
+        `mutation($t:ID!,$title:String!,$c:String,$s:String,$site:String,$d:String){logIncident(tenant_id:$t,title:$title,category:$c,severity:$s,site_name:$site,description:$d){incident_id}}`,
+        {
+          t: tenantId,
+          title: f.values.title.trim(),
+          c: f.values.category,
+          s: f.values.severity,
+          site: f.values.site || null,
+          d: f.values.description || null,
+        }
+      );
+      f.setValues({ title: "", category: "OTHER", severity: "LOW", site: "", description: "" });
+      f.setErrors({});
+      onDone();
+      onClose();
+    } catch (err) {
+      f.setErrors({ title: err.message });
+    } finally {
+      f.setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={open} title={t("qa.logIncident")} onClose={onClose}>
+      <form onSubmit={submit}>
+        <Field label={t("form.incidentTitle")} error={f.errors.title}>
+          <input
+            className={inputCls}
+            value={f.values.title}
+            onChange={f.set("title")}
+            placeholder="Worker slip near pier formwork"
+          />
+        </Field>
+        <Field label={t("form.incidentCategory")}>
+          <select className={inputCls} value={f.values.category} onChange={f.set("category")}>
+            <option value="INJURY">{t("inc.cat.INJURY")}</option>
+            <option value="NEAR_MISS">{t("inc.cat.NEAR_MISS")}</option>
+            <option value="PROPERTY_DAMAGE">{t("inc.cat.PROPERTY_DAMAGE")}</option>
+            <option value="ENVIRONMENTAL">{t("inc.cat.ENVIRONMENTAL")}</option>
+            <option value="OTHER">{t("inc.cat.OTHER")}</option>
+          </select>
+        </Field>
+        <Field label={t("form.incidentSeverity")}>
+          <select className={inputCls} value={f.values.severity} onChange={f.set("severity")}>
+            <option value="LOW">{t("inc.sev.LOW")}</option>
+            <option value="MEDIUM">{t("inc.sev.MEDIUM")}</option>
+            <option value="HIGH">{t("inc.sev.HIGH")}</option>
+            <option value="CRITICAL">{t("inc.sev.CRITICAL")}</option>
+          </select>
+        </Field>
+        <Field label={t("form.siteName")}>
+          <input
+            className={inputCls}
+            value={f.values.site}
+            onChange={f.set("site")}
+            placeholder="Site A — Pier Casting"
+          />
+        </Field>
+        <Field label={t("form.incidentDescription")}>
+          <textarea
+            className={`${inputCls} h-20`}
+            value={f.values.description}
+            onChange={f.set("description")}
+            placeholder="What happened, immediate action taken…"
+          />
+        </Field>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("btn.cancel")}
+          </Button>
+          <Button type="submit" disabled={f.busy}>
+            {f.busy ? t("btn.saving") : t("btn.logIncident")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function ProjectModal({ open, onClose, tenantId, onDone }) {
   const { t } = useI18n();
   const f = useForm({ code: "", name: "", location: "" });

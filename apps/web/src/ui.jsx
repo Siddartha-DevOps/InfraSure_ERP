@@ -63,6 +63,8 @@ const STATUS_STYLE = {
   PAID: { tone: "text-success-text bg-success-soft", icon: "✓" },
   PENDING: { tone: "text-warning-text bg-warning-soft", icon: "•" },
   OPEN: { tone: "text-warning-text bg-warning-soft", icon: "•" },
+  INVESTIGATING: { tone: "text-warning-text bg-warning-soft", icon: "•" },
+  CLOSED: { tone: "text-neutral bg-surface", icon: "✓" },
   DUE: { tone: "text-warning-text bg-warning-soft", icon: "•" },
   IN_ARBITRATION: { tone: "text-warning-text bg-warning-soft", icon: "•" },
   DRAFT: { tone: "text-neutral bg-surface", icon: "•" },

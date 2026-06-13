@@ -24,6 +24,7 @@ import {
 import { ContractorHome, VendorHome } from "./roleDashboards3.jsx";
 import { ReportsModule, ApprovalsModule } from "./reports.jsx";
 import { ProjectsModule } from "./projects.jsx";
+import { IncidentsModule } from "./incidents.jsx";
 import {
   ComplianceModule,
   AuditModule,
@@ -44,6 +45,7 @@ import {
   FinanceModal,
   ContractModal,
   ProjectModal,
+  IncidentModal,
 } from "./forms.jsx";
 
 // Role → sidebar modules ("home" is the role-specific dashboard).
@@ -58,6 +60,7 @@ const NAV_BY_ROLE = {
     "projects",
     "finance",
     "safety",
+    "incidents",
     "environment",
     "labour",
     "rera",
@@ -78,6 +81,7 @@ const NAV_BY_ROLE = {
     "projects",
     "finance",
     "safety",
+    "incidents",
     "environment",
     "labour",
     "rera",
@@ -96,6 +100,7 @@ const NAV_BY_ROLE = {
     "ai",
     "contracts",
     "projects",
+    "incidents",
     "finance",
     "rera",
     "vendors",
@@ -112,6 +117,7 @@ const NAV_BY_ROLE = {
     "contracts",
     "projects",
     "safety",
+    "incidents",
     "environment",
     "labour",
     "rera",
@@ -122,8 +128,8 @@ const NAV_BY_ROLE = {
     "approvals",
   ],
   ACCOUNTANT: ["home", "compliance", "audit", "ai", "finance", "labour", "reports", "approvals"],
-  ENGINEER: ["home", "projects", "safety", "environment", "contracts", "ai", "map"],
-  CONTRACTOR: ["home", "projects", "contracts", "safety", "map"],
+  ENGINEER: ["home", "projects", "safety", "incidents", "environment", "contracts", "ai", "map"],
+  CONTRACTOR: ["home", "projects", "contracts", "safety", "incidents", "map"],
   VENDOR: ["home", "contracts"],
 };
 
@@ -141,6 +147,7 @@ const DATASETS_BY_ROLE = {
     "expiring",
     "finance",
     "safety",
+    "incidents",
     "rera",
     "vendors",
     "disputes",
@@ -162,6 +169,7 @@ const DATASETS_BY_ROLE = {
     "projects",
     "expiring",
     "safety",
+    "incidents",
     "environment",
     "labour",
     "rera",
@@ -194,6 +202,7 @@ const DATASETS_BY_ROLE = {
     "projects",
     "expiring",
     "safety",
+    "incidents",
     "environment",
     "kpis",
     "ai",
@@ -209,6 +218,7 @@ const DATASETS_BY_ROLE = {
     "dashboardSummary",
     "dprs",
     "safety",
+    "incidents",
     "sites",
     "contracts",
     "expiring",
@@ -222,6 +232,7 @@ const QUERIES = {
   expiring: `query($t:ID!){getExpiringContracts(tenant_id:$t,withinDays:30){contract_id title status expiry_date}}`,
   finance: `query($t:ID!){getFinanceRecords(tenant_id:$t){finance_id invoice_number amount gst_filing_status tds_status ra_bill_status due_date paid_date}}`,
   safety: `query($t:ID!){getSafetyAudits(tenant_id:$t){safety_id site_name checklist_status ppe_compliance audit_date}}`,
+  incidents: `query($t:ID!){getIncidents(tenant_id:$t){incident_id title category severity status site_name description occurred_at resolved_at}}`,
   environment: `query($t:ID!){getEnvironmentalLogs(tenant_id:$t){env_log_id log_type reading unit notes recorded_at}}`,
   labour: `query($t:ID!){getLabourFilings(tenant_id:$t){labour_id filing_type period worker_count amount status filed_date}}`,
   rera: `query($t:ID!){getReraFilings(tenant_id:$t){filing_id project_name filing_type status due_date filed_date}}`,
@@ -255,6 +266,7 @@ const FIELD_OF = {
   expiring: "getExpiringContracts",
   finance: "getFinanceRecords",
   safety: "getSafetyAudits",
+  incidents: "getIncidents",
   environment: "getEnvironmentalLogs",
   labour: "getLabourFilings",
   rera: "getReraFilings",
@@ -287,6 +299,7 @@ const EMPTY = {
   expiring: [],
   finance: [],
   safety: [],
+  incidents: [],
   environment: [],
   labour: [],
   rera: [],
@@ -511,16 +524,18 @@ function Dashboard({ session, onLogout }) {
     ENGINEER: [
       { label: tr("qa.newDPR"), onClick: () => setModal("dpr") },
       { label: tr("qa.logSafety"), onClick: () => setModal("safety") },
+      { label: tr("qa.logIncident"), onClick: () => setModal("incident") },
     ],
     ACCOUNTANT: [{ label: tr("qa.newFinance"), onClick: () => setModal("finance") }],
-    PROJECT_MANAGER: [{ label: tr("qa.newContract"), onClick: () => setModal("contract") }, { label: tr("qa.newProject"), onClick: () => setModal("project") }],
+    PROJECT_MANAGER: [{ label: tr("qa.newContract"), onClick: () => setModal("contract") }, { label: tr("qa.newProject"), onClick: () => setModal("project") }, { label: tr("qa.logIncident"), onClick: () => setModal("incident") }],
     ADMIN: [
       { label: tr("qa.newContract"), onClick: () => setModal("contract") },
       { label: tr("qa.newFinance"), onClick: () => setModal("finance") },
       { label: tr("qa.newProject"), onClick: () => setModal("project") },
+      { label: tr("qa.logIncident"), onClick: () => setModal("incident") },
     ],
-    COMPLIANCE_OFFICER: [],
-    CONTRACTOR: [{ label: tr("qa.newDPR"), onClick: () => setModal("dpr") }],
+    COMPLIANCE_OFFICER: [{ label: tr("qa.logIncident"), onClick: () => setModal("incident") }],
+    CONTRACTOR: [{ label: tr("qa.newDPR"), onClick: () => setModal("dpr") }, { label: tr("qa.logIncident"), onClick: () => setModal("incident") }],
     VENDOR: [],
   }[user.role];
 
@@ -597,6 +612,16 @@ function Dashboard({ session, onLogout }) {
           )}
           {tab === "finance" && <AccountantHome data={data} mutate={mutate} />}
           {tab === "safety" && <SafetyModule data={data} />}
+          {tab === "incidents" && (
+            <IncidentsModule
+              data={data}
+              loading={loading}
+              errors={dataErrors}
+              onRetry={refresh}
+              canAct={["ADMIN", "COMPANY_ADMIN", "PROJECT_MANAGER", "COMPLIANCE_OFFICER"].includes(user.role)}
+              mutate={mutate}
+            />
+          )}
           {tab === "environment" && <EnvironmentModule data={data} />}
           {tab === "labour" && (
             <LabourModule
@@ -658,6 +683,12 @@ function Dashboard({ session, onLogout }) {
       />
       <ProjectModal
         open={modal === "project"}
+        onClose={() => setModal(null)}
+        tenantId={user.tenant_id}
+        onDone={refresh}
+      />
+      <IncidentModal
+        open={modal === "incident"}
         onClose={() => setModal(null)}
         tenantId={user.tenant_id}
         onDone={refresh}
