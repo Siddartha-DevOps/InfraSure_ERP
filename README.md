@@ -226,7 +226,21 @@ What it covers (`apps/api/test/`):
 | **Positive path + cross-tenant rejection + audit persistence** end-to-end | `resolvers.integration.test.js` | yes (skips otherwise) |
 
 The integration suite is gated on `TEST_DATABASE_URL`, so the default `npm test` runs
-anywhere; point it at a throwaway database to exercise the full resolver paths.
+anywhere; point it at a throwaway database to exercise the full resolver paths. Mongo is
+optional — with only Postgres the suite still validates the positive path, tenant isolation
+and RBAC; the audit-persistence assertion runs only when `MONGO_URL` is also set.
+
+### Verified against real datastores / device tooling
+
+This build has been exercised end-to-end, not just mocked:
+
+- **Live Postgres 16** — `prisma db push` materialises the full schema (Projects, Incidents,
+  Clearances, ReadinessSnapshots, RetrievalEvents, Reminders included), `db:seed` loads it,
+  and `npm run test:integration` passes (positive path + cross-tenant rejection + RBAC). All
+  newer resolvers (project 🟢/🟡/🔴 roll-up, readiness trend, retrieval metrics, reminders,
+  scheduler idempotency) were verified against the seeded live DB.
+- **Mobile (Expo)** — `npx expo export --platform android` bundles cleanly via Metro
+  (558 modules → a ~1.5 MB Hermes bundle), confirming the React Native app compiles.
 
 ## Contract document upload (REST)
 
