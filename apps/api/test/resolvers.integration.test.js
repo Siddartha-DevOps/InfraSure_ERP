@@ -10,6 +10,9 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 
 const RUN = Boolean(process.env.TEST_DATABASE_URL);
+// Mongo is optional: with only Postgres the suite still validates the positive
+// path, tenant isolation and RBAC; the audit-persistence assertion needs Mongo.
+const RUN_MONGO = RUN && Boolean(process.env.MONGO_URL);
 if (RUN) process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 // Import lazily so the Prisma client / Mongo aren't required when skipping.
@@ -21,7 +24,7 @@ before(async (t) => {
   ({ default: prisma } = await import("@infrasure/db"));
   ({ resolvers } = await import("../src/resolvers.js"));
   ({ connectMongo, closeMongo } = await import("../src/mongo.js"));
-  await connectMongo();
+  if (RUN_MONGO) await connectMongo();
 
   tenantA = await prisma.tenant.create({ data: { company_name: "IT-A" } });
   tenantB = await prisma.tenant.create({ data: { company_name: "IT-B" } });
@@ -40,7 +43,7 @@ after(async () => {
   await prisma.tenant.delete({ where: { tenant_id: tenantA.tenant_id } });
   await prisma.tenant.delete({ where: { tenant_id: tenantB.tenant_id } });
   await prisma.$disconnect();
-  await closeMongo();
+  if (RUN_MONGO) await closeMongo();
 });
 
 test("positive path: Engineer creates a DPR and reads it back", { skip: !RUN }, async () => {
@@ -56,7 +59,7 @@ test("positive path: Engineer creates a DPR and reads it back", { skip: !RUN }, 
   assert.ok(list.some((d) => d.dpr_id === dpr.dpr_id));
 });
 
-test("audit log written for the mutation", { skip: !RUN }, async () => {
+test("audit log written for the mutation", { skip: !RUN_MONGO }, async () => {
   const col = await connectMongo();
   const logs = await col
     .find({ tenant_id: tenantA.tenant_id, action: "createDPR" })
