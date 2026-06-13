@@ -145,6 +145,46 @@ async function main() {
     ],
   });
 
+  // --- Safety incidents (first-class incident log) ---
+  await prisma.incident.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projHighway.project_id,
+        title: "Worker slip near pier formwork",
+        site_name: "Site A — Pier Casting",
+        category: "INJURY",
+        severity: "MEDIUM",
+        status: "INVESTIGATING",
+        description: "Minor ankle injury; first aid administered. Wet surface flagged.",
+        reported_by: "Site Engineer",
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projCoastal.project_id,
+        title: "Crane load swing near-miss",
+        site_name: "Site B — Embankment",
+        category: "NEAR_MISS",
+        severity: "HIGH",
+        status: "OPEN",
+        description: "Load swung close to crew during high wind. No injuries.",
+        reported_by: "Safety Officer",
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projSkyline.project_id,
+        title: "Diesel spill at generator bay",
+        site_name: "Tower A — Basement",
+        category: "ENVIRONMENTAL",
+        severity: "LOW",
+        status: "RESOLVED",
+        description: "~5L spill contained with spill kit; area cleaned.",
+        reported_by: "Site Supervisor",
+        resolved_at: new Date("2026-05-20"),
+      },
+    ],
+  });
+
   await prisma.environmentalLog.createMany({
     data: [
       {

@@ -160,6 +160,13 @@ error states. **All 8 dashboards delivered:** Super Admin, Company Admin, Projec
 linked contract expiry + site status) plus a project registry, with a **New Project** quick
 action. Contracts now carry a **`contract_type`** (Agreement / Work Order / Insurance / Other).
 
+**Incident logs:** an `Incident` entity records safety events (Injury / Near-miss / Property
+damage / Environmental / Other) with a **severity** (Low→Critical) and a **status workflow**
+(Open → Investigating → Resolved → Closed). The **Incidents** tab shows a severity breakdown
+plus the full register; field roles **Log Incident** (`logIncident`) and Compliance/PM
+advance status (`updateIncidentStatus`). Both mutations are audit-logged; reads are
+RBAC-gated (`getIncidents`).
+
 New backend: `Contractor` model, `getDashboardSummary` (compliance/risk/health scores),
 `getContractors`, `getAuditFeed`, and the platform queries — all RBAC-gated and (for
 mutations) audit-logged. Seed adds a second tenant + a user per new role.

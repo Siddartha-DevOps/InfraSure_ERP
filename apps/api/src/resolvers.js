@@ -38,6 +38,10 @@ export const resolvers = {
     paid_date: (f) => iso(f.paid_date),
   },
   Safety: { audit_date: (s) => iso(s.audit_date) },
+  Incident: {
+    occurred_at: (i) => iso(i.occurred_at),
+    resolved_at: (i) => iso(i.resolved_at),
+  },
   Dpr: { created_at: (d) => iso(d.created_at) },
   EnvironmentalReport: { created_at: (e) => iso(e.created_at) },
   EnvironmentalLog: { recorded_at: (e) => iso(e.recorded_at) },
@@ -137,6 +141,14 @@ export const resolvers = {
     getSafetyAudits: async (_p, args, { user }) => {
       authorize("getSafetyAudits", args, user);
       return prisma.safety.findMany({ where: { tenant_id: args.tenant_id } });
+    },
+
+    getIncidents: async (_p, args, { user }) => {
+      authorize("getIncidents", args, user);
+      return prisma.incident.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { occurred_at: "desc" },
+      });
     },
 
     getEnvironmentalLogs: async (_p, args, { user }) => {
@@ -834,6 +846,56 @@ export const resolvers = {
         metadata: { safety_id: audit.safety_id },
       });
       return audit;
+    },
+
+    logIncident: async (_p, args, { user }) => {
+      authorize("logIncident", args, user);
+      const incident = await prisma.incident.create({
+        data: {
+          tenant_id: args.tenant_id,
+          title: args.title,
+          category: args.category ?? "OTHER",
+          severity: args.severity ?? "LOW",
+          site_name: args.site_name ?? null,
+          description: args.description ?? null,
+          reported_by: args.reported_by ?? null,
+          project_id: args.project_id ?? null,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "logIncident",
+        metadata: {
+          incident_id: incident.incident_id,
+          severity: incident.severity,
+          category: incident.category,
+        },
+      });
+      return incident;
+    },
+
+    updateIncidentStatus: async (_p, args, { user }) => {
+      authorize("updateIncidentStatus", args, user);
+      const existing = await prisma.incident.findFirst({
+        where: { incident_id: args.incident_id, tenant_id: args.tenant_id },
+      });
+      if (!existing) throw notFound("Incident");
+      const closing = args.status === "RESOLVED" || args.status === "CLOSED";
+      const incident = await prisma.incident.update({
+        where: { incident_id: args.incident_id },
+        data: {
+          status: args.status,
+          resolved_at: closing ? existing.resolved_at ?? new Date() : null,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "updateIncidentStatus",
+        metadata: { incident_id: incident.incident_id, status: incident.status },
+      });
+      return incident;
     },
 
     createDPR: async (_p, args, { user }) => {

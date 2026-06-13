@@ -84,6 +84,22 @@ export const typeDefs = /* GraphQL */ `
     incident_report_url: String
   }
 
+  # A logged safety incident (injury, near-miss, property/environmental event).
+  type Incident {
+    incident_id: ID!
+    tenant_id: ID!
+    project_id: ID
+    title: String!
+    site_name: String
+    category: String! # INJURY | NEAR_MISS | PROPERTY_DAMAGE | ENVIRONMENTAL | OTHER
+    severity: String! # LOW | MEDIUM | HIGH | CRITICAL
+    status: String! # OPEN | INVESTIGATING | RESOLVED | CLOSED
+    description: String
+    reported_by: String
+    occurred_at: String!
+    resolved_at: String
+  }
+
   type EnvironmentalLog {
     env_log_id: ID!
     tenant_id: ID!
@@ -316,6 +332,7 @@ export const typeDefs = /* GraphQL */ `
     getExpiringContracts(tenant_id: ID!, withinDays: Int = 30): [Contract!]!
     getFinanceRecords(tenant_id: ID!): [Finance!]!
     getSafetyAudits(tenant_id: ID!): [Safety!]!
+    getIncidents(tenant_id: ID!): [Incident!]!
     getEnvironmentalLogs(tenant_id: ID!): [EnvironmentalLog!]!
     getLabourFilings(tenant_id: ID!): [LabourFiling!]!
     getReraFilings(tenant_id: ID!): [ReraFiling!]!
@@ -400,6 +417,17 @@ export const typeDefs = /* GraphQL */ `
       ppe_compliance: Int
     ): Safety!
     createDPR(tenant_id: ID!, report_data: String!): Dpr!
+    logIncident(
+      tenant_id: ID!
+      title: String!
+      category: String
+      severity: String
+      site_name: String
+      description: String
+      reported_by: String
+      project_id: ID
+    ): Incident!
+    updateIncidentStatus(tenant_id: ID!, incident_id: ID!, status: String!): Incident!
 
     # --- Compliance / environment ---
     logEnvironmentalReport(tenant_id: ID!, report_data: String!): EnvironmentalReport!

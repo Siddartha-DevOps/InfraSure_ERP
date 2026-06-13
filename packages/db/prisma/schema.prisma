@@ -48,6 +48,7 @@ model Tenant {
   projects      Project[]
   contractors   Contractor[]
   workflowSteps WorkflowStep[]
+  incidents     Incident[]
 }
 
 model User {
@@ -243,15 +244,15 @@ model EnvironmentalReport {
 
 // Subcontractor registry (distinct from material Vendors) for the Contractor role.
 model Contractor {
-  contractor_id     String   @id @default(uuid())
-  tenant_id         String
-  name              String
-  trade             String? // e.g. "Civil", "Electrical", "Scaffolding"
-  contact_email     String?
-  active_projects   Int      @default(0)
-  compliance_score  Int      @default(100) // 0-100
-  status            String   @default("ACTIVE") // ACTIVE | SUSPENDED
-  created_at        DateTime @default(now())
+  contractor_id    String   @id @default(uuid())
+  tenant_id        String
+  name             String
+  trade            String? // e.g. "Civil", "Electrical", "Scaffolding"
+  contact_email    String?
+  active_projects  Int      @default(0)
+  compliance_score Int      @default(100) // 0-100
+  status           String   @default("ACTIVE") // ACTIVE | SUSPENDED
+  created_at       DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 
@@ -270,6 +271,30 @@ model Project {
   tenant    Tenant     @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
   contracts Contract[]
   sites     Site[]
+  incidents Incident[]
+
+  @@index([tenant_id])
+}
+
+// Safety incident log: injuries, near-misses, property/environmental events.
+// A first-class, queryable entity (distinct from the periodic Safety audit).
+model Incident {
+  incident_id String    @id @default(uuid())
+  tenant_id   String
+  project_id  String?
+  title       String
+  site_name   String?
+  category    String    @default("OTHER") // INJURY | NEAR_MISS | PROPERTY_DAMAGE | ENVIRONMENTAL | OTHER
+  severity    String    @default("LOW") // LOW | MEDIUM | HIGH | CRITICAL
+  status      String    @default("OPEN") // OPEN | INVESTIGATING | RESOLVED | CLOSED
+  description String?
+  reported_by String?
+  occurred_at DateTime  @default(now())
+  resolved_at DateTime?
+  created_at  DateTime  @default(now())
+
+  tenant  Tenant   @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+  project Project? @relation(fields: [project_id], references: [project_id], onDelete: SetNull)
 
   @@index([tenant_id])
 }
