@@ -86,6 +86,31 @@ async function computeReadiness(tenant_id) {
   };
 }
 
+// Aggregates document-retrieval timings over a window into the reporting KPI.
+async function computeRetrievalMetrics(tenant_id, withinDays = 30) {
+  const since = new Date();
+  since.setDate(since.getDate() - withinDays);
+  const events = await prisma.retrievalEvent.findMany({
+    where: { tenant_id, retrieved_at: { gte: since } },
+    orderBy: { retrieved_at: "desc" },
+  });
+  if (events.length === 0) {
+    return { count: 0, avg_seconds: 0, p95_seconds: 0, fastest_seconds: 0, last_retrieved: null };
+  }
+  const sorted = events.map((e) => e.duration_ms).sort((a, b) => a - b);
+  const sum = sorted.reduce((a, b) => a + b, 0);
+  // Nearest-rank p95.
+  const p95idx = Math.min(sorted.length - 1, Math.ceil(0.95 * sorted.length) - 1);
+  const toSec = (ms) => Math.round((ms / 1000) * 100) / 100;
+  return {
+    count: events.length,
+    avg_seconds: toSec(sum / sorted.length),
+    p95_seconds: toSec(sorted[p95idx]),
+    fastest_seconds: toSec(sorted[0]),
+    last_retrieved: events[0].retrieved_at,
+  };
+}
+
 export const resolvers = {
   // Date fields are stored as DateTime but exposed as ISO strings.
   Contract: { expiry_date: (c) => iso(c.expiry_date) },
@@ -126,6 +151,7 @@ export const resolvers = {
   },
   Subscription: { current_period_end: (s) => iso(s.current_period_end) },
   ReadinessSnapshot: { captured_at: (s) => iso(s.captured_at) },
+  RetrievalMetrics: { last_retrieved: (m) => iso(m.last_retrieved) },
 
   Query: {
     me: async (_p, _a, { user }) => {
@@ -392,6 +418,11 @@ export const resolvers = {
         take: limit,
       });
       return rows.reverse();
+    },
+
+    getRetrievalMetrics: async (_p, args, { user }) => {
+      authorize("getRetrievalMetrics", args, user);
+      return computeRetrievalMetrics(args.tenant_id, args.withinDays ?? 30);
     },
 
     // ---- Phase 4: AI insights ----
@@ -1233,6 +1264,22 @@ export const resolvers = {
         metadata: { snapshot_id: snapshot.snapshot_id, score: snapshot.score },
       });
       return snapshot;
+    },
+
+    recordRetrieval: async (_p, args, { user }) => {
+      authorize("recordRetrieval", args, user);
+      // Clamp to a sane range so a stray client value can't skew the KPI.
+      const duration_ms = Math.max(0, Math.min(args.duration_ms | 0, 600000));
+      await prisma.retrievalEvent.create({
+        data: {
+          tenant_id: args.tenant_id,
+          user_id: user.user_id,
+          kind: args.kind || "PACK",
+          label: args.label ?? null,
+          duration_ms,
+        },
+      });
+      return computeRetrievalMetrics(args.tenant_id, 30);
     },
 
     // ---- Phase 3: Vendors ----

@@ -51,6 +51,7 @@ model Tenant {
   incidents     Incident[]
   clearances    Clearance[]
   readinessSnapshots ReadinessSnapshot[]
+  retrievalEvents    RetrievalEvent[]
 }
 
 model User {
@@ -207,6 +208,22 @@ model ReadinessSnapshot {
   open_disputes          Int      @default(0)
   vendor_compliance_rate Float    @default(0)
   captured_at            DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+
+  @@index([tenant_id])
+}
+
+// Audit document-retrieval timing: how fast an evidence pack / document / export
+// is produced. Powers the "avg document retrieval" KPI in the Reports module.
+model RetrievalEvent {
+  retrieval_id String   @id @default(uuid())
+  tenant_id    String
+  user_id      String?
+  kind         String   @default("PACK") // PACK | EXPORT | DOCUMENT
+  label        String?
+  duration_ms  Int      @default(0)
+  retrieved_at DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 

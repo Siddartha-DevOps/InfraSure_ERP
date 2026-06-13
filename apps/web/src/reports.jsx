@@ -20,6 +20,7 @@ export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, rol
   const gstFiled = fin.filter((f) => f.gst_filing_status === "FILED").length;
   const gstPending = fin.length - gstFiled;
   const a = data.audit;
+  const rm = data.retrievalMetrics;
   const canCapture =
     mutate && ["COMPLIANCE_OFFICER", "PROJECT_MANAGER", "ADMIN", "COMPANY_ADMIN"].includes(role);
   // Map readiness snapshots → {label: month, value: score} for the line chart.
@@ -33,42 +34,64 @@ export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, rol
       {}
     );
 
+  // Time a document-production action and report it to the retrieval-time KPI.
+  function timed(kind, label, fn) {
+    const start = performance.now();
+    const ok = fn();
+    if (mutate && ok !== false) {
+      mutate(
+        `mutation($t:ID!,$k:String!,$d:Int!,$l:String){recordRetrieval(tenant_id:$t,kind:$k,duration_ms:$d,label:$l){count}}`,
+        { k: kind, d: Math.round(performance.now() - start), l: label }
+      );
+    }
+  }
+
   function exportContracts() {
-    downloadCsv("contracts.csv", data.contracts || [], [
-      { header: "Title", value: (r) => r.title },
-      { header: "Status", value: (r) => r.status },
-      { header: "Expiry", value: (r) => day(r.expiry_date) },
-      { header: "Version", value: (r) => r.version },
-    ]);
+    timed("EXPORT", "contracts.csv", () =>
+      downloadCsv("contracts.csv", data.contracts || [], [
+        { header: "Title", value: (r) => r.title },
+        { header: "Status", value: (r) => r.status },
+        { header: "Expiry", value: (r) => day(r.expiry_date) },
+        { header: "Version", value: (r) => r.version },
+      ])
+    );
   }
   function exportFinance() {
-    downloadCsv("finance.csv", fin, [
-      { header: "Invoice", value: (r) => r.invoice_number },
-      { header: "Amount", value: (r) => r.amount },
-      { header: "GST", value: (r) => r.gst_filing_status },
-      { header: "TDS", value: (r) => r.tds_status },
-      { header: "RA bill", value: (r) => r.ra_bill_status },
-      { header: "Due", value: (r) => day(r.due_date) },
-      { header: "Paid", value: (r) => day(r.paid_date) },
-    ]);
+    timed("EXPORT", "finance.csv", () =>
+      downloadCsv("finance.csv", fin, [
+        { header: "Invoice", value: (r) => r.invoice_number },
+        { header: "Amount", value: (r) => r.amount },
+        { header: "GST", value: (r) => r.gst_filing_status },
+        { header: "TDS", value: (r) => r.tds_status },
+        { header: "RA bill", value: (r) => r.ra_bill_status },
+        { header: "Due", value: (r) => day(r.due_date) },
+        { header: "Paid", value: (r) => day(r.paid_date) },
+      ])
+    );
   }
   function exportAudit() {
-    downloadCsv("audit-log.csv", data.auditFeed || [], [
-      { header: "Action", value: (r) => r.action },
-      { header: "User", value: (r) => r.user_id },
-      { header: "Timestamp", value: (r) => r.timestamp },
-    ]);
+    timed("EXPORT", "audit-log.csv", () =>
+      downloadCsv("audit-log.csv", data.auditFeed || [], [
+        { header: "Action", value: (r) => r.action },
+        { header: "User", value: (r) => r.user_id },
+        { header: "Timestamp", value: (r) => r.timestamp },
+      ])
+    );
   }
   function exportSafety() {
-    downloadCsv("safety.csv", data.safety || [], [
-      { header: "Site", value: (r) => r.site_name },
-      { header: "Date", value: (r) => day(r.audit_date) },
-      { header: "Status", value: (r) => r.checklist_status },
-      { header: "PPE%", value: (r) => r.ppe_compliance },
-    ]);
+    timed("EXPORT", "safety.csv", () =>
+      downloadCsv("safety.csv", data.safety || [], [
+        { header: "Site", value: (r) => r.site_name },
+        { header: "Date", value: (r) => day(r.audit_date) },
+        { header: "Status", value: (r) => r.checklist_status },
+        { header: "PPE%", value: (r) => r.ppe_compliance },
+      ])
+    );
   }
   function exportPdf() {
-    openCompliancePack(data, { t, company: tenant?.company_name });
+    timed("PACK", "Compliance Pack", () =>
+      openCompliancePack(data, { t, company: tenant?.company_name })
+    );
   }
 
   return (
@@ -95,6 +118,25 @@ export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, rol
             </div>
           ) : (
             <EmptyState icon="🗂️" title={t("empty.noAudit")} />
+          )}
+        </Section>
+      </Card>
+
+      <Card title={t("rep.retrieval")}>
+        <Section loading={loading} error={errors.retrievalMetrics} onRetry={onRetry}>
+          {rm && rm.count > 0 ? (
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <p className="text-3xl font-semibold text-primary">{rm.avg_seconds}s</p>
+                <p className="text-xs text-neutral">{t("rep.retrievalAvg")}</p>
+              </div>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                <Kpi label={t("rep.retrievalP95")} value={`${rm.p95_seconds}s`} suffix="" />
+                <Kpi label={t("rep.retrievalCount")} value={rm.count} suffix="" />
+              </div>
+            </div>
+          ) : (
+            <EmptyState icon="⏱️" title={t("rep.noRetrieval")} />
           )}
         </Section>
       </Card>
