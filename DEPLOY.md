@@ -53,8 +53,12 @@ clearly-labelled stub results.
 
 1. In **Vercel** → **Add New** → **Project** → import this repo.
 2. **Settings → General**:
-   - **Root Directory** = repo root (leave blank / `.`). The root `vercel.json` drives the
-     build (`buildCommand: npm run build --workspace apps/web`, output `apps/web/dist`).
+   - **Root Directory** — pick **one** (both are configured to work):
+     - **empty / `.`** (repo root) → uses the root `vercel.json` (`npm run build --workspace apps/web`, output `apps/web/dist`), **or**
+     - **`apps/web`** → uses `apps/web/vercel.json`; Vercel auto-detects Vite and serves `dist`.
+     - ⚠️ This field takes a **folder path inside the repo** — *not* a Git URL. If you see
+       `The specified Root Directory "https://github.com/…​.git" does not exist`, clear the
+       field (leave it empty) and save. The repo URL belongs in **Settings → Git**, not here.
    - **Node.js Version** = **22.x** (the repo pins this via `engines` + `.nvmrc`; Vite 8
      requires Node ≥ 20).
 3. **Settings → Environment Variables** → add:
