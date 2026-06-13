@@ -585,6 +585,7 @@ export const typeDefs = /* GraphQL */ `
     # --- Phase 4: External integrations ---
     syncTallyLedger(tenant_id: ID!): IntegrationResult!
     fileGSTReturn(tenant_id: ID!, finance_id: ID!): IntegrationResult!
+    fileEPFOReturn(tenant_id: ID!, labour_id: ID!): IntegrationResult!
     syncReraUpdates(tenant_id: ID!): IntegrationResult!
     requestAadhaarESign(tenant_id: ID!, contract_id: ID!): IntegrationResult!
     importBimModel(tenant_id: ID!, url: String): IntegrationResult!

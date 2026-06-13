@@ -18,6 +18,7 @@ import {
   integrationStatus,
   syncTallyLedger,
   fileGstReturnExternal,
+  fileEpfoReturn,
   syncReraUpdates,
   requestAadhaarEsign,
   importBimModel,
@@ -1603,6 +1604,21 @@ export const resolvers = {
         user_id: user.user_id,
         action: "fileGSTReturn",
         metadata: { finance_id: args.finance_id, reference: r.reference, driver: r.driver },
+      });
+      return r;
+    },
+
+    fileEPFOReturn: async (_p, args, { user }) => {
+      authorize("fileEPFOReturn", args, user);
+      const r = await fileEpfoReturn({
+        tenant_id: args.tenant_id,
+        labour_id: args.labour_id,
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "fileEPFOReturn",
+        metadata: { labour_id: args.labour_id, reference: r.reference, driver: r.driver },
       });
       return r;
     },

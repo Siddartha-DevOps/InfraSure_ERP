@@ -64,6 +64,7 @@ export const PERMISSIONS = {
     "updateLabourFilingStatus",
     "syncTallyLedger",
     "fileGSTReturn",
+    "fileEPFOReturn",
   ],
   COMPLIANCE_OFFICER: [
     "getDashboardSummary",
@@ -109,6 +110,7 @@ export const PERMISSIONS = {
     "logEnvironmentalLog",
     "createLabourFiling",
     "updateLabourFilingStatus",
+    "fileEPFOReturn",
     "createReraFiling",
     "updateReraFilingStatus",
     "createVendor",
