@@ -84,6 +84,11 @@ All new operations are RBAC-gated per role and every mutation is audit-logged to
   `captureAuditReadinessSnapshot` (idempotent per day, audit-logged) appends a point — a
   daily scheduler/cron calls it in production, or Compliance/PM capture one manually via the
   **Capture snapshot** button. Seed includes 6 monthly snapshots so the trend renders.
+- **Exports:** the Reports module exports per-domain **CSV** (contracts / finance / safety /
+  audit log) plus a one-click **Compliance Pack PDF** (`src/pdf.js`) — a print-optimized
+  evidence pack (readiness score + trend + compliance KPIs + contract/clearance/incident/
+  finance registers) generated client-side with zero dependencies via the browser's
+  Save-as-PDF, supporting the audit document-retrieval-time story.
 - **Stripe billing & tiers:** BASIC/PRO/ENTERPRISE via a billing adapter
   (`getBillingTiers`, `getSubscription`, `changeSubscriptionPlan`, `createBillingCheckout`).
   Defaults to a **stub** driver; set `BILLING_DRIVER=stripe` + `STRIPE_SECRET_KEY` for real

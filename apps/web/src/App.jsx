@@ -621,7 +621,7 @@ function Dashboard({ session, onLogout }) {
           {tab === "map" && <ProjectMap sites={data.sites} />}
           {tab === "compliance" && <ComplianceModule data={data} />}
           {tab === "projects" && <ProjectsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} />}
-          {tab === "reports" && <ReportsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} mutate={mutate} role={user.role} />}
+          {tab === "reports" && <ReportsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} mutate={mutate} role={user.role} tenant={tenant} />}
           {tab === "approvals" && <ApprovalsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} mutate={mutate} role={user.role} />}
           {tab === "audit" && <AuditModule data={data} />}
           {tab === "ai" && <AIModule data={data} />}
