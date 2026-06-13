@@ -13,5 +13,8 @@
     "dev:web": "npm run dev --workspace apps/web",
     "db:setup": "npm run db:setup --workspace apps/api"
   },
+  "engines": {
+    "node": "22.x"
+  },
   "license": "UNLICENSED"
 }
