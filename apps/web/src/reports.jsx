@@ -13,12 +13,24 @@ import { useI18n } from "./i18n.jsx";
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const day = (iso) => (iso || "").slice(0, 10);
 
-export function ReportsModule({ data, loading, errors = {}, onRetry }) {
+export function ReportsModule({ data, loading, errors = {}, onRetry, mutate, role }) {
   const { t } = useI18n();
   const fin = data.finance || [];
   const gstFiled = fin.filter((f) => f.gst_filing_status === "FILED").length;
   const gstPending = fin.length - gstFiled;
   const a = data.audit;
+  const canCapture =
+    mutate && ["COMPLIANCE_OFFICER", "PROJECT_MANAGER", "ADMIN", "COMPANY_ADMIN"].includes(role);
+  // Map readiness snapshots → {label: month, value: score} for the line chart.
+  const readinessTrend = (data.readinessTrend || []).map((s) => ({
+    label: (s.captured_at || "").slice(0, 7),
+    value: s.score,
+  }));
+  const captureSnapshot = () =>
+    mutate(
+      `mutation($t:ID!){captureAuditReadinessSnapshot(tenant_id:$t){snapshot_id score}}`,
+      {}
+    );
 
   function exportContracts() {
     downloadCsv("contracts.csv", data.contracts || [], [
@@ -92,6 +104,31 @@ export function ReportsModule({ data, loading, errors = {}, onRetry }) {
             </>
           ) : (
             <EmptyState icon="📈" title={t("rep.noTrend")} />
+          )}
+        </Section>
+      </Card>
+
+      <Card
+        title={t("rep.readinessTrend")}
+        wide
+        action={
+          canCapture ? (
+            <Button variant="secondary" onClick={captureSnapshot}>
+              📸 {t("rep.captureSnapshot")}
+            </Button>
+          ) : null
+        }
+      >
+        <Section loading={loading} error={errors.readinessTrend} onRetry={onRetry}>
+          {readinessTrend.length ? (
+            <>
+              <LineChart data={readinessTrend} color="#1E3A8A" />
+              <p className="text-xs text-neutral mt-1">
+                {t("kpi.readiness")} % / {t("th.period")}
+              </p>
+            </>
+          ) : (
+            <EmptyState icon="🗂️" title={t("rep.noReadinessTrend")} />
           )}
         </Section>
       </Card>

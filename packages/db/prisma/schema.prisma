@@ -50,6 +50,7 @@ model Tenant {
   workflowSteps WorkflowStep[]
   incidents     Incident[]
   clearances    Clearance[]
+  readinessSnapshots ReadinessSnapshot[]
 }
 
 model User {
@@ -190,6 +191,24 @@ model Clearance {
 
   tenant  Tenant   @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
   project Project? @relation(fields: [project_id], references: [project_id], onDelete: SetNull)
+
+  @@index([tenant_id])
+}
+
+// Periodic point-in-time snapshot of the audit-readiness score for trend
+// charting. A daily scheduler (or manual capture) appends one per tenant per day.
+model ReadinessSnapshot {
+  snapshot_id            String   @id @default(uuid())
+  tenant_id              String
+  score                  Float    @default(0)
+  documents_verified     Int      @default(0)
+  documents_total        Int      @default(0)
+  pending_approvals      Int      @default(0)
+  open_disputes          Int      @default(0)
+  vendor_compliance_rate Float    @default(0)
+  captured_at            DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
 
   @@index([tenant_id])
 }

@@ -362,6 +362,27 @@ async function main() {
     data: { tenant_id: tenant.tenant_id, name: "Approve RA Bill #1" },
   });
 
+  // --- Audit-readiness history (monthly snapshots powering the trend chart) ---
+  // In production a daily scheduler appends these via captureAuditReadinessSnapshot.
+  const monthsAgo = (n) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - n);
+    d.setHours(9, 0, 0, 0);
+    return d;
+  };
+  await prisma.readinessSnapshot.createMany({
+    data: [62.4, 65.1, 68.9, 71.2, 74.8, 78.3].map((score, i) => ({
+      tenant_id: tenant.tenant_id,
+      score,
+      documents_verified: 2 + i,
+      documents_total: 8,
+      pending_approvals: 6 - i,
+      open_disputes: i < 3 ? 2 : 1,
+      vendor_compliance_rate: 80 + i * 2,
+      captured_at: monthsAgo(5 - i),
+    })),
+  });
+
   // A second tenant so the Super Admin platform view shows a real portfolio.
   const tenant2 = await prisma.tenant.create({
     data: {
