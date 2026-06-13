@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { gql, uploadContractDocument } from "./api.js";
-import { Sidebar, TopBar } from "./layout.jsx";
+import { TopTabs, TopBar } from "./layout.jsx";
 import { buildAlerts } from "./alerts.js";
 import { Button, inputCls } from "./ui.jsx";
 import { ProjectMap } from "./ProjectMap.jsx";
@@ -602,16 +602,15 @@ function Dashboard({ session, onLogout }) {
     );
 
   return (
-    <div className="min-h-screen bg-surface flex">
+    <div className="min-h-screen bg-surface">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:text-primary focus:px-4 focus:py-2 focus:rounded-lg"
       >
         {tr("a11y.skip")}
       </a>
-      <Sidebar tabs={tabs} tab={tab} setTab={setTab} quickActions={quickActions} />
 
-      <div className="flex-1 min-w-0">
+      <div className="sticky top-0 z-40 shadow-sm">
         <TopBar
           user={user}
           tenant={tenant}
@@ -621,8 +620,10 @@ function Dashboard({ session, onLogout }) {
           onSearchPick={onSearchPick}
           auditFeed={data.auditFeed}
         />
+        <TopTabs tabs={tabs} tab={tab} setTab={setTab} quickActions={quickActions} />
+      </div>
 
-        <main id="main" className="p-6 grid gap-5 md:grid-cols-2" aria-live="polite">
+      <main id="main" className="p-6 grid gap-5 md:grid-cols-2 max-w-screen-2xl mx-auto" aria-live="polite">
           {err && (
             <p className="text-danger col-span-2" role="alert">
               {err}
@@ -699,7 +700,6 @@ function Dashboard({ session, onLogout }) {
             />
           )}
         </main>
-      </div>
 
       <NewDPRModal
         open={modal === "dpr"}

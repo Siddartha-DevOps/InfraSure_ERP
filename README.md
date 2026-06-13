@@ -125,8 +125,9 @@ Tokens live in `apps/web/tailwind.config.js`; components in `apps/web/src/ui.jsx
 - **Palette:** Primary `#1E3A8A` (deep blue) · Success `#10B981` · Warning `#F59E0B` ·
   Danger `#DC2626` · Neutral `#6B7280` · Surface `#F3F4F6`.
 - **Typography:** Inter (400–700); headings bold 18–24px, KPIs semi-bold 20–28px.
-- **Layout:** left sidebar (modules + role quick actions) + top bar (alerts bell with
-  severity badge, profile).
+- **Layout:** top header (brand + tenant workspace, global search, audit-logs, alerts bell
+  with severity badge, language, profile) over a horizontal **module tab bar** with a
+  role-scoped **quick-actions** dropdown.
 - **Components:** KPI cards (trend arrows), status pills (icon + text, never color-only),
   severity-coded alerts feed, dependency-free SVG line/bar charts, modals with
   inline-validated forms, site status board (🟢/🟡/🔴 per site).
