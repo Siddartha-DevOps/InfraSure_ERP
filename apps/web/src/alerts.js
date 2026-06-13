@@ -22,6 +22,20 @@ export function buildAlerts(data, t = (k) => k, mutate = null, role = null) {
     });
   }
 
+  for (const c of data.clearances || []) {
+    if (c.renewal_status === "VALID") continue;
+    const d = daysUntil(c.expiry_date);
+    const label = t(`cl.type.${c.clearance_type}`);
+    alerts.push({
+      severity: c.renewal_status === "EXPIRED" ? "critical" : "warning",
+      text:
+        c.renewal_status === "EXPIRED"
+          ? t("alert.clearanceExpired", { type: label, days: -d })
+          : t("alert.clearanceExpiring", { type: label, days: d }),
+      module: t("nav.clearances"),
+    });
+  }
+
   for (const f of data.finance || []) {
     if (!f.paid_date && daysUntil(f.due_date) < 0) {
       const a = {

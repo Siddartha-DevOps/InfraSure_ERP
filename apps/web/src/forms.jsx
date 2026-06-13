@@ -375,6 +375,139 @@ export function IncidentModal({ open, onClose, tenantId, onDone }) {
   );
 }
 
+export function ClearanceModal({ open, onClose, tenantId, onDone }) {
+  const { t } = useI18n();
+  const f = useForm({
+    clearance_type: "CONSENT_TO_OPERATE",
+    authority: "",
+    reference_no: "",
+    issue: "",
+    expiry: "",
+  });
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!f.values.expiry) return f.setErrors({ expiry: t("err.expiryRequired") });
+    f.setBusy(true);
+    try {
+      await gql(
+        `mutation($t:ID!,$ct:String!,$e:String!,$a:String,$ref:String,$iss:String){createClearance(tenant_id:$t,clearance_type:$ct,expiry_date:$e,authority:$a,reference_no:$ref,issue_date:$iss){clearance_id}}`,
+        {
+          t: tenantId,
+          ct: f.values.clearance_type,
+          e: f.values.expiry,
+          a: f.values.authority || null,
+          ref: f.values.reference_no || null,
+          iss: f.values.issue || null,
+        }
+      );
+      f.setValues({ clearance_type: "CONSENT_TO_OPERATE", authority: "", reference_no: "", issue: "", expiry: "" });
+      f.setErrors({});
+      onDone();
+      onClose();
+    } catch (err) {
+      f.setErrors({ expiry: err.message });
+    } finally {
+      f.setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={open} title={t("qa.newClearance")} onClose={onClose}>
+      <form onSubmit={submit}>
+        <Field label={t("form.clearanceType")}>
+          <select className={inputCls} value={f.values.clearance_type} onChange={f.set("clearance_type")}>
+            <option value="CONSENT_TO_OPERATE">{t("cl.type.CONSENT_TO_OPERATE")}</option>
+            <option value="CONSENT_TO_ESTABLISH">{t("cl.type.CONSENT_TO_ESTABLISH")}</option>
+            <option value="ENVIRONMENTAL_CLEARANCE">{t("cl.type.ENVIRONMENTAL_CLEARANCE")}</option>
+            <option value="FOREST">{t("cl.type.FOREST")}</option>
+            <option value="CRZ">{t("cl.type.CRZ")}</option>
+            <option value="OTHER">{t("cl.type.OTHER")}</option>
+          </select>
+        </Field>
+        <Field label={t("form.clearanceAuthority")}>
+          <input
+            className={inputCls}
+            value={f.values.authority}
+            onChange={f.set("authority")}
+            placeholder="State PCB / MoEFCC"
+          />
+        </Field>
+        <Field label={t("form.clearanceReference")}>
+          <input
+            className={inputCls}
+            value={f.values.reference_no}
+            onChange={f.set("reference_no")}
+            placeholder="CTO/2026/SKY-901"
+          />
+        </Field>
+        <Field label={t("form.clearanceIssue")}>
+          <input type="date" className={inputCls} value={f.values.issue} onChange={f.set("issue")} />
+        </Field>
+        <Field label={t("form.clearanceExpiry")} error={f.errors.expiry}>
+          <input type="date" className={inputCls} value={f.values.expiry} onChange={f.set("expiry")} />
+        </Field>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("btn.cancel")}
+          </Button>
+          <Button type="submit" disabled={f.busy}>
+            {f.busy ? t("btn.saving") : t("btn.createClearance")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function RenewClearanceModal({ open, onClose, tenantId, clearance, onDone }) {
+  const { t } = useI18n();
+  const f = useForm({ expiry: "" });
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!f.values.expiry) return f.setErrors({ expiry: t("err.expiryRequired") });
+    f.setBusy(true);
+    try {
+      await gql(
+        `mutation($t:ID!,$id:ID!,$e:String!){renewClearance(tenant_id:$t,clearance_id:$id,new_expiry_date:$e){clearance_id}}`,
+        { t: tenantId, id: clearance.clearance_id, e: f.values.expiry }
+      );
+      f.setValues({ expiry: "" });
+      f.setErrors({});
+      onDone();
+      onClose();
+    } catch (err) {
+      f.setErrors({ expiry: err.message });
+    } finally {
+      f.setBusy(false);
+    }
+  }
+
+  if (!clearance) return null;
+  return (
+    <Modal open={open} title={t("cl.renewTitle")} onClose={onClose}>
+      <form onSubmit={submit}>
+        <p className="text-sm text-neutral mb-3">
+          {t(`cl.type.${clearance.clearance_type}`)}
+          {clearance.reference_no ? ` · ${clearance.reference_no}` : ""}
+        </p>
+        <Field label={t("form.clearanceNewExpiry")} error={f.errors.expiry}>
+          <input type="date" className={inputCls} value={f.values.expiry} onChange={f.set("expiry")} />
+        </Field>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("btn.cancel")}
+          </Button>
+          <Button type="submit" disabled={f.busy}>
+            {f.busy ? t("btn.saving") : t("cl.renew")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function ProjectModal({ open, onClose, tenantId, onDone }) {
   const { t } = useI18n();
   const f = useForm({ code: "", name: "", location: "" });
