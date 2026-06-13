@@ -6,6 +6,14 @@ import bcrypt from "bcryptjs";
 const PASSWORD = "Passw0rd!";
 
 async function main() {
+  // Idempotent: never double-seed an already-populated database. This makes the
+  // seed safe to run on every container start (SEED_ON_START) and on re-deploys.
+  const existing = await prisma.user.count();
+  if (existing > 0) {
+    console.log(`↩︎  Database already has ${existing} user(s); skipping seed.`);
+    return;
+  }
+
   const password_hash = await bcrypt.hash(PASSWORD, 10);
 
   const tenant = await prisma.tenant.create({
