@@ -302,6 +302,19 @@ export const typeDefs = /* GraphQL */ `
     audit_readiness_score: Float!
   }
 
+  # A point-in-time audit-readiness snapshot for the historical trend chart.
+  type ReadinessSnapshot {
+    snapshot_id: ID!
+    tenant_id: ID!
+    score: Float!
+    documents_verified: Int!
+    documents_total: Int!
+    pending_approvals: Int!
+    open_disputes: Int!
+    vendor_compliance_rate: Float!
+    captured_at: String!
+  }
+
   # Computed compliance KPIs for the Phase 2 dashboard.
   type ComplianceKPIs {
     gst_filing_compliance: Float!
@@ -363,6 +376,8 @@ export const typeDefs = /* GraphQL */ `
     getSubscription(tenant_id: ID!): Subscription
     getBillingTiers: [BillingTier!]!
     getAuditReadiness(tenant_id: ID!): AuditReadiness!
+    # Historical audit-readiness snapshots (oldest→newest) for the trend chart.
+    getAuditReadinessTrend(tenant_id: ID!, limit: Int = 12): [ReadinessSnapshot!]!
 
     # --- Phase 4 ---
     getAIInsights(tenant_id: ID!): AIInsights!
@@ -487,6 +502,9 @@ export const typeDefs = /* GraphQL */ `
     # --- Project management ---
     approveWorkflowStep(tenant_id: ID!, step_id: ID!): WorkflowStep!
     assignUserRole(tenant_id: ID!, user_id: ID!, role: Role!): User!
+    # Capture the current audit-readiness as a snapshot (idempotent per day).
+    # A daily scheduler calls this; can also be triggered manually.
+    captureAuditReadinessSnapshot(tenant_id: ID!): ReadinessSnapshot!
 
     # --- Phase 3: Vendors ---
     createVendor(

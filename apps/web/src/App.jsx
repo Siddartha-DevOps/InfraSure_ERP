@@ -161,6 +161,7 @@ const DATASETS_BY_ROLE = {
     "disputes",
     "kpis",
     "audit",
+    "readinessTrend",
     "ai",
     "dprs",
     "steps",
@@ -186,6 +187,7 @@ const DATASETS_BY_ROLE = {
     "disputes",
     "kpis",
     "audit",
+    "readinessTrend",
     "ai",
     "steps",
     "sites",
@@ -199,6 +201,7 @@ const DATASETS_BY_ROLE = {
     "labour",
     "kpis",
     "audit",
+    "readinessTrend",
     "ai",
     "dashboardSummary",
     "auditFeed",
@@ -252,6 +255,7 @@ const QUERIES = {
   disputes: `query($t:ID!){getDisputes(tenant_id:$t){dispute_id title dispute_type counterparty amount status escalation_level}}`,
   kpis: `query($t:ID!){getComplianceKPIs(tenant_id:$t){gst_filing_compliance tds_filing_compliance ra_bill_approval_rate safety_audit_completion avg_ppe_compliance pf_esi_filing_rate rera_filing_rate overdue_payments audit_readiness_score}}`,
   audit: `query($t:ID!){getAuditReadiness(tenant_id:$t){documents_verified documents_total pending_approvals open_disputes vendor_compliance_rate audit_readiness_score}}`,
+  readinessTrend: `query($t:ID!){getAuditReadinessTrend(tenant_id:$t,limit:12){snapshot_id score captured_at}}`,
   ai: `query($t:ID!){getAIInsights(tenant_id:$t){available predictive_score risk_level weak_factors anomalies{finance_id type severity detail}}}`,
   dprs: `query($t:ID!){getDPRs(tenant_id:$t){dpr_id report_data created_at}}`,
   steps: `query($t:ID!){getWorkflowSteps(tenant_id:$t){step_id name status}}`,
@@ -287,6 +291,7 @@ const FIELD_OF = {
   disputes: "getDisputes",
   kpis: "getComplianceKPIs",
   audit: "getAuditReadiness",
+  readinessTrend: "getAuditReadinessTrend",
   ai: "getAIInsights",
   dprs: "getDPRs",
   steps: "getWorkflowSteps",
@@ -331,6 +336,7 @@ const EMPTY = {
   platformAuditFeed: [],
   kpis: null,
   audit: null,
+  readinessTrend: [],
   ai: null,
   subscription: null,
   dashboardSummary: null,
@@ -615,7 +621,7 @@ function Dashboard({ session, onLogout }) {
           {tab === "map" && <ProjectMap sites={data.sites} />}
           {tab === "compliance" && <ComplianceModule data={data} />}
           {tab === "projects" && <ProjectsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} />}
-          {tab === "reports" && <ReportsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} />}
+          {tab === "reports" && <ReportsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} mutate={mutate} role={user.role} />}
           {tab === "approvals" && <ApprovalsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} mutate={mutate} role={user.role} />}
           {tab === "audit" && <AuditModule data={data} />}
           {tab === "ai" && <AIModule data={data} />}

@@ -30,6 +30,62 @@ function notFound(entity) {
   });
 }
 
+// Shared audit-readiness computation, used by the live query and by snapshots.
+async function computeReadiness(tenant_id) {
+  const where = { tenant_id };
+  const [contracts, steps, finances, labour, rera, vendors, disputes] =
+    await Promise.all([
+      prisma.contract.findMany({ where }),
+      prisma.workflowStep.findMany({ where }),
+      prisma.finance.findMany({ where }),
+      prisma.labourFiling.findMany({ where }),
+      prisma.reraFiling.findMany({ where }),
+      prisma.vendor.findMany({ where }),
+      prisma.dispute.findMany({ where }),
+    ]);
+
+  const round = (x) => Math.round(x * 10) / 10;
+  const documents_total = contracts.length;
+  const documents_verified = contracts.filter((c) => c.document_url).length;
+
+  const pending_approvals =
+    steps.filter((s) => s.status === "PENDING").length +
+    finances.filter((f) => f.ra_bill_status !== "APPROVED").length +
+    labour.filter((l) => l.status !== "FILED").length +
+    rera.filter((r) => r.status === "PENDING").length;
+
+  const open_disputes = disputes.filter((d) => d.status !== "RESOLVED").length;
+
+  const now = new Date();
+  const vendorValid = vendors.filter(
+    (v) =>
+      v.status === "ACTIVE" &&
+      (!v.certification_expiry || new Date(v.certification_expiry) >= now)
+  ).length;
+  const vendor_compliance_rate =
+    vendors.length === 0 ? 100 : (vendorValid / vendors.length) * 100;
+
+  // Readiness: documents verified, vendor compliance, and penalties for
+  // pending approvals and open disputes (each capped so score stays 0–100).
+  const docScore =
+    documents_total === 0 ? 100 : (documents_verified / documents_total) * 100;
+  const approvalPenalty = Math.min(pending_approvals * 5, 40);
+  const disputePenalty = Math.min(open_disputes * 5, 30);
+  const score = Math.max(
+    0,
+    (docScore + vendor_compliance_rate) / 2 - approvalPenalty - disputePenalty
+  );
+
+  return {
+    documents_verified,
+    documents_total,
+    pending_approvals,
+    open_disputes,
+    vendor_compliance_rate: round(vendor_compliance_rate),
+    audit_readiness_score: round(score),
+  };
+}
+
 export const resolvers = {
   // Date fields are stored as DateTime but exposed as ISO strings.
   Contract: { expiry_date: (c) => iso(c.expiry_date) },
@@ -69,6 +125,7 @@ export const resolvers = {
     resolved_at: (d) => iso(d.resolved_at),
   },
   Subscription: { current_period_end: (s) => iso(s.current_period_end) },
+  ReadinessSnapshot: { captured_at: (s) => iso(s.captured_at) },
 
   Query: {
     me: async (_p, _a, { user }) => {
@@ -322,60 +379,19 @@ export const resolvers = {
     // Rolls up document/approval/dispute/vendor signals into a readiness score.
     getAuditReadiness: async (_p, args, { user }) => {
       authorize("getAuditReadiness", args, user);
-      const where = { tenant_id: args.tenant_id };
-      const [contracts, steps, finances, labour, rera, vendors, disputes] =
-        await Promise.all([
-          prisma.contract.findMany({ where }),
-          prisma.workflowStep.findMany({ where }),
-          prisma.finance.findMany({ where }),
-          prisma.labourFiling.findMany({ where }),
-          prisma.reraFiling.findMany({ where }),
-          prisma.vendor.findMany({ where }),
-          prisma.dispute.findMany({ where }),
-        ]);
+      return computeReadiness(args.tenant_id);
+    },
 
-      const round = (x) => Math.round(x * 10) / 10;
-      const documents_total = contracts.length;
-      const documents_verified = contracts.filter((c) => c.document_url).length;
-
-      const pending_approvals =
-        steps.filter((s) => s.status === "PENDING").length +
-        finances.filter((f) => f.ra_bill_status !== "APPROVED").length +
-        labour.filter((l) => l.status !== "FILED").length +
-        rera.filter((r) => r.status === "PENDING").length;
-
-      const open_disputes = disputes.filter(
-        (d) => d.status !== "RESOLVED"
-      ).length;
-
-      const now = new Date();
-      const vendorValid = vendors.filter(
-        (v) =>
-          v.status === "ACTIVE" &&
-          (!v.certification_expiry || new Date(v.certification_expiry) >= now)
-      ).length;
-      const vendor_compliance_rate =
-        vendors.length === 0 ? 100 : (vendorValid / vendors.length) * 100;
-
-      // Readiness: documents verified, vendor compliance, and penalties for
-      // pending approvals and open disputes (each capped so score stays 0–100).
-      const docScore =
-        documents_total === 0 ? 100 : (documents_verified / documents_total) * 100;
-      const approvalPenalty = Math.min(pending_approvals * 5, 40);
-      const disputePenalty = Math.min(open_disputes * 5, 30);
-      const score = Math.max(
-        0,
-        (docScore + vendor_compliance_rate) / 2 - approvalPenalty - disputePenalty
-      );
-
-      return {
-        documents_verified,
-        documents_total,
-        pending_approvals,
-        open_disputes,
-        vendor_compliance_rate: round(vendor_compliance_rate),
-        audit_readiness_score: round(score),
-      };
+    getAuditReadinessTrend: async (_p, args, { user }) => {
+      authorize("getAuditReadinessTrend", args, user);
+      const limit = args.limit ?? 12;
+      // Fetch newest N, then reverse to oldest→newest for left-to-right charting.
+      const rows = await prisma.readinessSnapshot.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { captured_at: "desc" },
+        take: limit,
+      });
+      return rows.reverse();
     },
 
     // ---- Phase 4: AI insights ----
@@ -1180,6 +1196,43 @@ export const resolvers = {
         metadata: { target_user_id: args.user_id, role: args.role },
       });
       return updated;
+    },
+
+    captureAuditReadinessSnapshot: async (_p, args, { user }) => {
+      authorize("captureAuditReadinessSnapshot", args, user);
+      const r = await computeReadiness(args.tenant_id);
+      const data = {
+        tenant_id: args.tenant_id,
+        score: r.audit_readiness_score,
+        documents_verified: r.documents_verified,
+        documents_total: r.documents_total,
+        pending_approvals: r.pending_approvals,
+        open_disputes: r.open_disputes,
+        vendor_compliance_rate: r.vendor_compliance_rate,
+      };
+
+      // Idempotent per day: a daily scheduler may call this repeatedly, so
+      // reuse today's snapshot instead of appending duplicates.
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const existing = await prisma.readinessSnapshot.findFirst({
+        where: { tenant_id: args.tenant_id, captured_at: { gte: start } },
+        orderBy: { captured_at: "desc" },
+      });
+      const snapshot = existing
+        ? await prisma.readinessSnapshot.update({
+            where: { snapshot_id: existing.snapshot_id },
+            data,
+          })
+        : await prisma.readinessSnapshot.create({ data });
+
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "captureAuditReadinessSnapshot",
+        metadata: { snapshot_id: snapshot.snapshot_id, score: snapshot.score },
+      });
+      return snapshot;
     },
 
     // ---- Phase 3: Vendors ----
