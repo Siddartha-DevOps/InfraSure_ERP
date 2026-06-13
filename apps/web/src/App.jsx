@@ -25,6 +25,7 @@ import { ContractorHome, VendorHome } from "./roleDashboards3.jsx";
 import { ReportsModule, ApprovalsModule } from "./reports.jsx";
 import { ProjectsModule } from "./projects.jsx";
 import { IncidentsModule } from "./incidents.jsx";
+import { ClearanceModule } from "./clearances.jsx";
 import {
   ComplianceModule,
   AuditModule,
@@ -46,6 +47,8 @@ import {
   ContractModal,
   ProjectModal,
   IncidentModal,
+  ClearanceModal,
+  RenewClearanceModal,
 } from "./forms.jsx";
 
 // Role → sidebar modules ("home" is the role-specific dashboard).
@@ -62,6 +65,7 @@ const NAV_BY_ROLE = {
     "safety",
     "incidents",
     "environment",
+    "clearances",
     "labour",
     "rera",
     "vendors",
@@ -83,6 +87,7 @@ const NAV_BY_ROLE = {
     "safety",
     "incidents",
     "environment",
+    "clearances",
     "labour",
     "rera",
     "vendors",
@@ -101,6 +106,7 @@ const NAV_BY_ROLE = {
     "contracts",
     "projects",
     "incidents",
+    "clearances",
     "finance",
     "rera",
     "vendors",
@@ -119,6 +125,7 @@ const NAV_BY_ROLE = {
     "safety",
     "incidents",
     "environment",
+    "clearances",
     "labour",
     "rera",
     "vendors",
@@ -128,8 +135,8 @@ const NAV_BY_ROLE = {
     "approvals",
   ],
   ACCOUNTANT: ["home", "compliance", "audit", "ai", "finance", "labour", "reports", "approvals"],
-  ENGINEER: ["home", "projects", "safety", "incidents", "environment", "contracts", "ai", "map"],
-  CONTRACTOR: ["home", "projects", "contracts", "safety", "incidents", "map"],
+  ENGINEER: ["home", "projects", "safety", "incidents", "clearances", "environment", "contracts", "ai", "map"],
+  CONTRACTOR: ["home", "projects", "contracts", "safety", "incidents", "clearances", "map"],
   VENDOR: ["home", "contracts"],
 };
 
@@ -148,6 +155,7 @@ const DATASETS_BY_ROLE = {
     "finance",
     "safety",
     "incidents",
+    "clearances",
     "rera",
     "vendors",
     "disputes",
@@ -171,6 +179,7 @@ const DATASETS_BY_ROLE = {
     "safety",
     "incidents",
     "environment",
+    "clearances",
     "labour",
     "rera",
     "vendors",
@@ -203,6 +212,7 @@ const DATASETS_BY_ROLE = {
     "expiring",
     "safety",
     "incidents",
+    "clearances",
     "environment",
     "kpis",
     "ai",
@@ -219,6 +229,7 @@ const DATASETS_BY_ROLE = {
     "dprs",
     "safety",
     "incidents",
+    "clearances",
     "sites",
     "contracts",
     "expiring",
@@ -233,6 +244,7 @@ const QUERIES = {
   finance: `query($t:ID!){getFinanceRecords(tenant_id:$t){finance_id invoice_number amount gst_filing_status tds_status ra_bill_status due_date paid_date}}`,
   safety: `query($t:ID!){getSafetyAudits(tenant_id:$t){safety_id site_name checklist_status ppe_compliance audit_date}}`,
   incidents: `query($t:ID!){getIncidents(tenant_id:$t){incident_id title category severity status site_name description occurred_at resolved_at}}`,
+  clearances: `query($t:ID!){getClearances(tenant_id:$t){clearance_id clearance_type authority reference_no issue_date expiry_date status renewal_status}}`,
   environment: `query($t:ID!){getEnvironmentalLogs(tenant_id:$t){env_log_id log_type reading unit notes recorded_at}}`,
   labour: `query($t:ID!){getLabourFilings(tenant_id:$t){labour_id filing_type period worker_count amount status filed_date}}`,
   rera: `query($t:ID!){getReraFilings(tenant_id:$t){filing_id project_name filing_type status due_date filed_date}}`,
@@ -267,6 +279,7 @@ const FIELD_OF = {
   finance: "getFinanceRecords",
   safety: "getSafetyAudits",
   incidents: "getIncidents",
+  clearances: "getClearances",
   environment: "getEnvironmentalLogs",
   labour: "getLabourFilings",
   rera: "getReraFilings",
@@ -300,6 +313,7 @@ const EMPTY = {
   finance: [],
   safety: [],
   incidents: [],
+  clearances: [],
   environment: [],
   labour: [],
   rera: [],
@@ -401,6 +415,7 @@ function Dashboard({ session, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [modal, setModal] = useState(null);
+  const [renewTarget, setRenewTarget] = useState(null);
   const [checkout, setCheckout] = useState(null);
   const [integrationMsg, setIntegrationMsg] = useState("");
 
@@ -527,14 +542,15 @@ function Dashboard({ session, onLogout }) {
       { label: tr("qa.logIncident"), onClick: () => setModal("incident") },
     ],
     ACCOUNTANT: [{ label: tr("qa.newFinance"), onClick: () => setModal("finance") }],
-    PROJECT_MANAGER: [{ label: tr("qa.newContract"), onClick: () => setModal("contract") }, { label: tr("qa.newProject"), onClick: () => setModal("project") }, { label: tr("qa.logIncident"), onClick: () => setModal("incident") }],
+    PROJECT_MANAGER: [{ label: tr("qa.newContract"), onClick: () => setModal("contract") }, { label: tr("qa.newProject"), onClick: () => setModal("project") }, { label: tr("qa.logIncident"), onClick: () => setModal("incident") }, { label: tr("qa.newClearance"), onClick: () => setModal("clearance") }],
     ADMIN: [
       { label: tr("qa.newContract"), onClick: () => setModal("contract") },
       { label: tr("qa.newFinance"), onClick: () => setModal("finance") },
       { label: tr("qa.newProject"), onClick: () => setModal("project") },
       { label: tr("qa.logIncident"), onClick: () => setModal("incident") },
+      { label: tr("qa.newClearance"), onClick: () => setModal("clearance") },
     ],
-    COMPLIANCE_OFFICER: [{ label: tr("qa.logIncident"), onClick: () => setModal("incident") }],
+    COMPLIANCE_OFFICER: [{ label: tr("qa.logIncident"), onClick: () => setModal("incident") }, { label: tr("qa.newClearance"), onClick: () => setModal("clearance") }],
     CONTRACTOR: [{ label: tr("qa.newDPR"), onClick: () => setModal("dpr") }, { label: tr("qa.logIncident"), onClick: () => setModal("incident") }],
     VENDOR: [],
   }[user.role];
@@ -622,6 +638,16 @@ function Dashboard({ session, onLogout }) {
               mutate={mutate}
             />
           )}
+          {tab === "clearances" && (
+            <ClearanceModule
+              data={data}
+              loading={loading}
+              errors={dataErrors}
+              onRetry={refresh}
+              canAct={["ADMIN", "COMPANY_ADMIN", "PROJECT_MANAGER", "COMPLIANCE_OFFICER"].includes(user.role)}
+              onRenew={setRenewTarget}
+            />
+          )}
           {tab === "environment" && <EnvironmentModule data={data} />}
           {tab === "labour" && (
             <LabourModule
@@ -690,6 +716,19 @@ function Dashboard({ session, onLogout }) {
       <IncidentModal
         open={modal === "incident"}
         onClose={() => setModal(null)}
+        tenantId={user.tenant_id}
+        onDone={refresh}
+      />
+      <ClearanceModal
+        open={modal === "clearance"}
+        onClose={() => setModal(null)}
+        tenantId={user.tenant_id}
+        onDone={refresh}
+      />
+      <RenewClearanceModal
+        open={!!renewTarget}
+        clearance={renewTarget}
+        onClose={() => setRenewTarget(null)}
         tenantId={user.tenant_id}
         onDone={refresh}
       />

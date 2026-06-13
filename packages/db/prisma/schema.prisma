@@ -49,6 +49,7 @@ model Tenant {
   contractors   Contractor[]
   workflowSteps WorkflowStep[]
   incidents     Incident[]
+  clearances    Clearance[]
 }
 
 model User {
@@ -172,6 +173,27 @@ model Safety {
   @@index([tenant_id])
 }
 
+// Environmental clearances / statutory consents with renewal tracking.
+// renewal health (VALID/EXPIRING/EXPIRED) is derived from expiry_date.
+model Clearance {
+  clearance_id   String    @id @default(uuid())
+  tenant_id      String
+  project_id     String?
+  clearance_type String    @default("OTHER") // CONSENT_TO_OPERATE | CONSENT_TO_ESTABLISH | FOREST | CRZ | ENVIRONMENTAL_CLEARANCE | OTHER
+  authority      String? // issuing body, e.g. SPCB / MoEFCC
+  reference_no   String?
+  issue_date     DateTime?
+  expiry_date    DateTime
+  status         String    @default("ACTIVE") // ACTIVE | RENEWED | EXPIRED
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+  project Project? @relation(fields: [project_id], references: [project_id], onDelete: SetNull)
+
+  @@index([tenant_id])
+}
+
 // Pollution / waste readings for environmental compliance.
 model EnvironmentalLog {
   env_log_id  String   @id @default(uuid())
@@ -269,9 +291,10 @@ model Project {
   created_at DateTime @default(now())
 
   tenant    Tenant     @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
-  contracts Contract[]
-  sites     Site[]
-  incidents Incident[]
+  contracts  Contract[]
+  sites      Site[]
+  incidents  Incident[]
+  clearances Clearance[]
 
   @@index([tenant_id])
 }

@@ -42,6 +42,19 @@ export const resolvers = {
     occurred_at: (i) => iso(i.occurred_at),
     resolved_at: (i) => iso(i.resolved_at),
   },
+  Clearance: {
+    issue_date: (c) => iso(c.issue_date),
+    expiry_date: (c) => iso(c.expiry_date),
+    // 🟢 VALID / 🟡 EXPIRING (≤30d) / 🔴 EXPIRED — derived from expiry_date.
+    renewal_status: (c) => {
+      const now = new Date();
+      const expiry = new Date(c.expiry_date);
+      if (expiry < now) return "EXPIRED";
+      const soon = new Date();
+      soon.setDate(soon.getDate() + 30);
+      return expiry <= soon ? "EXPIRING" : "VALID";
+    },
+  },
   Dpr: { created_at: (d) => iso(d.created_at) },
   EnvironmentalReport: { created_at: (e) => iso(e.created_at) },
   EnvironmentalLog: { recorded_at: (e) => iso(e.recorded_at) },
@@ -148,6 +161,25 @@ export const resolvers = {
       return prisma.incident.findMany({
         where: { tenant_id: args.tenant_id },
         orderBy: { occurred_at: "desc" },
+      });
+    },
+
+    getClearances: async (_p, args, { user }) => {
+      authorize("getClearances", args, user);
+      return prisma.clearance.findMany({
+        where: { tenant_id: args.tenant_id },
+        orderBy: { expiry_date: "asc" },
+      });
+    },
+
+    getExpiringClearances: async (_p, args, { user }) => {
+      authorize("getExpiringClearances", args, user);
+      const withinDays = args.withinDays ?? 30;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + withinDays);
+      return prisma.clearance.findMany({
+        where: { tenant_id: args.tenant_id, expiry_date: { lte: cutoff } },
+        orderBy: { expiry_date: "asc" },
       });
     },
 
@@ -896,6 +928,56 @@ export const resolvers = {
         metadata: { incident_id: incident.incident_id, status: incident.status },
       });
       return incident;
+    },
+
+    createClearance: async (_p, args, { user }) => {
+      authorize("createClearance", args, user);
+      const clearance = await prisma.clearance.create({
+        data: {
+          tenant_id: args.tenant_id,
+          clearance_type: args.clearance_type,
+          expiry_date: new Date(args.expiry_date),
+          authority: args.authority ?? null,
+          reference_no: args.reference_no ?? null,
+          issue_date: args.issue_date ? new Date(args.issue_date) : null,
+          project_id: args.project_id ?? null,
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "createClearance",
+        metadata: {
+          clearance_id: clearance.clearance_id,
+          clearance_type: clearance.clearance_type,
+        },
+      });
+      return clearance;
+    },
+
+    renewClearance: async (_p, args, { user }) => {
+      authorize("renewClearance", args, user);
+      const existing = await prisma.clearance.findFirst({
+        where: { clearance_id: args.clearance_id, tenant_id: args.tenant_id },
+      });
+      if (!existing) throw notFound("Clearance");
+      const clearance = await prisma.clearance.update({
+        where: { clearance_id: args.clearance_id },
+        data: {
+          expiry_date: new Date(args.new_expiry_date),
+          status: "RENEWED",
+        },
+      });
+      await writeAuditLog({
+        tenant_id: args.tenant_id,
+        user_id: user.user_id,
+        action: "renewClearance",
+        metadata: {
+          clearance_id: clearance.clearance_id,
+          new_expiry_date: args.new_expiry_date,
+        },
+      });
+      return clearance;
     },
 
     createDPR: async (_p, args, { user }) => {

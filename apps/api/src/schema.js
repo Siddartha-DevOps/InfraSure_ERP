@@ -100,6 +100,20 @@ export const typeDefs = /* GraphQL */ `
     resolved_at: String
   }
 
+  # An environmental clearance / statutory consent with renewal tracking.
+  type Clearance {
+    clearance_id: ID!
+    tenant_id: ID!
+    project_id: ID
+    clearance_type: String! # CONSENT_TO_OPERATE | CONSENT_TO_ESTABLISH | FOREST | CRZ | ENVIRONMENTAL_CLEARANCE | OTHER
+    authority: String
+    reference_no: String
+    issue_date: String
+    expiry_date: String!
+    status: String! # ACTIVE | RENEWED | EXPIRED
+    renewal_status: String! # VALID | EXPIRING | EXPIRED (derived from expiry_date)
+  }
+
   type EnvironmentalLog {
     env_log_id: ID!
     tenant_id: ID!
@@ -333,6 +347,9 @@ export const typeDefs = /* GraphQL */ `
     getFinanceRecords(tenant_id: ID!): [Finance!]!
     getSafetyAudits(tenant_id: ID!): [Safety!]!
     getIncidents(tenant_id: ID!): [Incident!]!
+    getClearances(tenant_id: ID!): [Clearance!]!
+    # Clearances expiring within the given window (default 30 days) — renewal alerts.
+    getExpiringClearances(tenant_id: ID!, withinDays: Int = 30): [Clearance!]!
     getEnvironmentalLogs(tenant_id: ID!): [EnvironmentalLog!]!
     getLabourFilings(tenant_id: ID!): [LabourFiling!]!
     getReraFilings(tenant_id: ID!): [ReraFiling!]!
@@ -428,6 +445,17 @@ export const typeDefs = /* GraphQL */ `
       project_id: ID
     ): Incident!
     updateIncidentStatus(tenant_id: ID!, incident_id: ID!, status: String!): Incident!
+    createClearance(
+      tenant_id: ID!
+      clearance_type: String!
+      expiry_date: String!
+      authority: String
+      reference_no: String
+      issue_date: String
+      project_id: ID
+    ): Clearance!
+    # Renew a clearance: extends expiry to new_expiry_date and marks it RENEWED.
+    renewClearance(tenant_id: ID!, clearance_id: ID!, new_expiry_date: String!): Clearance!
 
     # --- Compliance / environment ---
     logEnvironmentalReport(tenant_id: ID!, report_data: String!): EnvironmentalReport!

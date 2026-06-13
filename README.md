@@ -167,6 +167,14 @@ plus the full register; field roles **Log Incident** (`logIncident`) and Complia
 advance status (`updateIncidentStatus`). Both mutations are audit-logged; reads are
 RBAC-gated (`getIncidents`).
 
+**Environmental clearances:** a `Clearance` entity tracks statutory consents (Consent to
+Operate/Establish, Environmental Clearance, Forest, CRZ, Other) with issuing authority,
+reference number and **expiry-driven renewal health** — `renewal_status` is derived
+server-side as 🟢 VALID / 🟡 EXPIRING (≤30d) / 🔴 EXPIRED. The **Clearances** tab shows a
+roll-up + register; Compliance/PM **create** (`createClearance`) and **renew**
+(`renewClearance`, extends expiry + marks RENEWED). `getExpiringClearances` powers renewal
+alerts in the consolidated alerts feed. All mutations audit-logged; reads RBAC-gated.
+
 New backend: `Contractor` model, `getDashboardSummary` (compliance/risk/health scores),
 `getContractors`, `getAuditFeed`, and the platform queries — all RBAC-gated and (for
 mutations) audit-logged. Seed adds a second tenant + a user per new role.

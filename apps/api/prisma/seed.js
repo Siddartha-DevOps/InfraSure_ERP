@@ -185,6 +185,40 @@ async function main() {
     ],
   });
 
+  // --- Environmental clearances (renewal tracking) ---
+  await prisma.clearance.createMany({
+    data: [
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projHighway.project_id,
+        clearance_type: "ENVIRONMENTAL_CLEARANCE",
+        authority: "MoEFCC",
+        reference_no: "EC/2024/HW-2117",
+        issue_date: new Date("2024-04-01"),
+        expiry_date: new Date("2027-03-31"), // valid
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projSkyline.project_id,
+        clearance_type: "CONSENT_TO_OPERATE",
+        authority: "State PCB",
+        reference_no: "CTO/2025/SKY-883",
+        issue_date: new Date("2025-07-01"),
+        expiry_date: new Date("2026-06-25"), // expiring soon
+      },
+      {
+        tenant_id: tenant.tenant_id,
+        project_id: projCoastal.project_id,
+        clearance_type: "CRZ",
+        authority: "Coastal Zone Authority",
+        reference_no: "CRZ/2023/CST-440",
+        issue_date: new Date("2023-01-15"),
+        expiry_date: new Date("2026-05-31"), // expired
+        status: "EXPIRED",
+      },
+    ],
+  });
+
   await prisma.environmentalLog.createMany({
     data: [
       {
