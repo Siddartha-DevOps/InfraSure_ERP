@@ -45,6 +45,7 @@ model Tenant {
   vendors       Vendor[]
   disputes      Dispute[]
   sites         Site[]
+  projects      Project[]
   contractors   Contractor[]
   workflowSteps WorkflowStep[]
 }
@@ -118,17 +119,20 @@ model Dispute {
 }
 
 model Contract {
-  contract_id  String   @id @default(uuid())
-  tenant_id    String
-  title        String
-  expiry_date  DateTime
-  status       String   @default("DRAFT")
-  document_url String?
-  version      Int      @default(1)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  contract_id   String   @id @default(uuid())
+  tenant_id     String
+  project_id    String?
+  title         String
+  contract_type String   @default("AGREEMENT") // AGREEMENT | WORK_ORDER | INSURANCE | OTHER
+  expiry_date   DateTime
+  status        String   @default("DRAFT")
+  document_url  String?
+  version       Int      @default(1)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+  project Project? @relation(fields: [project_id], references: [project_id], onDelete: SetNull)
 
   @@index([tenant_id])
 }
@@ -254,17 +258,35 @@ model Contractor {
   @@index([tenant_id])
 }
 
+// A construction project — groups contracts and sites for a compliance roll-up.
+model Project {
+  project_id String   @id @default(uuid())
+  tenant_id  String
+  code       String // e.g. "PRJ-001"
+  name       String
+  location   String?
+  created_at DateTime @default(now())
+
+  tenant    Tenant     @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+  contracts Contract[]
+  sites     Site[]
+
+  @@index([tenant_id])
+}
+
 // Geo-tagged project sites for the compliance map.
 model Site {
   site_id    String   @id @default(uuid())
   tenant_id  String
+  project_id String?
   name       String
   latitude   Float
   longitude  Float
   status     String   @default("PENDING") // COMPLIANT | PENDING | NON_COMPLIANT
   created_at DateTime @default(now())
 
-  tenant Tenant @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenant_id], references: [tenant_id], onDelete: Cascade)
+  project Project? @relation(fields: [project_id], references: [project_id], onDelete: SetNull)
 
   @@index([tenant_id])
 }

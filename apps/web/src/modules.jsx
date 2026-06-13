@@ -132,6 +132,7 @@ export function ContractsModule({ data, canUpload, handleUpload }) {
         <thead className="sticky top-0 bg-white">
           <tr className="text-left text-neutral">
             <th scope="col" className="py-1 font-medium">{t("th.title")}</th>
+            <th scope="col" className="font-medium">{t("th.ctype")}</th>
             <th scope="col" className="font-medium">{t("th.status")}</th>
             <th scope="col" className="font-medium">{t("th.expiry")}</th>
             <th scope="col" className="font-medium">{t("th.document")}</th>
@@ -144,6 +145,7 @@ export function ContractsModule({ data, canUpload, handleUpload }) {
             return (
               <tr key={c.contract_id} className="border-t border-gray-100 align-middle">
                 <td className="py-2">{c.title}</td>
+                <td className="text-gray-600">{t(`ctype.${c.contract_type}`)}</td>
                 <td><StatusPill value={c.status} /></td>
                 <td className={soon ? "text-warning-text font-medium" : ""}>
                   {day(c.expiry_date)}

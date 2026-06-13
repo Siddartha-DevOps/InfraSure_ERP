@@ -23,6 +23,7 @@ import {
 } from "./roleDashboards2.jsx";
 import { ContractorHome, VendorHome } from "./roleDashboards3.jsx";
 import { ReportsModule, ApprovalsModule } from "./reports.jsx";
+import { ProjectsModule } from "./projects.jsx";
 import {
   ComplianceModule,
   AuditModule,
@@ -42,6 +43,7 @@ import {
   SafetyAuditModal,
   FinanceModal,
   ContractModal,
+  ProjectModal,
 } from "./forms.jsx";
 
 // Role → sidebar modules ("home" is the role-specific dashboard).
@@ -53,6 +55,7 @@ const NAV_BY_ROLE = {
     "audit",
     "ai",
     "contracts",
+    "projects",
     "finance",
     "safety",
     "environment",
@@ -72,6 +75,7 @@ const NAV_BY_ROLE = {
     "audit",
     "ai",
     "contracts",
+    "projects",
     "finance",
     "safety",
     "environment",
@@ -91,6 +95,7 @@ const NAV_BY_ROLE = {
     "audit",
     "ai",
     "contracts",
+    "projects",
     "finance",
     "rera",
     "vendors",
@@ -105,6 +110,7 @@ const NAV_BY_ROLE = {
     "audit",
     "ai",
     "contracts",
+    "projects",
     "safety",
     "environment",
     "labour",
@@ -116,8 +122,8 @@ const NAV_BY_ROLE = {
     "approvals",
   ],
   ACCOUNTANT: ["home", "compliance", "audit", "ai", "finance", "labour", "reports", "approvals"],
-  ENGINEER: ["home", "safety", "environment", "contracts", "ai", "map"],
-  CONTRACTOR: ["home", "contracts", "safety", "map"],
+  ENGINEER: ["home", "projects", "safety", "environment", "contracts", "ai", "map"],
+  CONTRACTOR: ["home", "projects", "contracts", "safety", "map"],
   VENDOR: ["home", "contracts"],
 };
 
@@ -131,6 +137,7 @@ const DATASETS_BY_ROLE = {
   ADMIN: "all",
   PROJECT_MANAGER: [
     "contracts",
+    "projects",
     "expiring",
     "finance",
     "safety",
@@ -152,6 +159,7 @@ const DATASETS_BY_ROLE = {
   ],
   COMPLIANCE_OFFICER: [
     "contracts",
+    "projects",
     "expiring",
     "safety",
     "environment",
@@ -183,6 +191,7 @@ const DATASETS_BY_ROLE = {
   ],
   ENGINEER: [
     "contracts",
+    "projects",
     "expiring",
     "safety",
     "environment",
@@ -195,6 +204,7 @@ const DATASETS_BY_ROLE = {
     "auditFeed",
   ],
   CONTRACTOR: [
+    "projects",
     "myContractor",
     "dashboardSummary",
     "dprs",
@@ -207,7 +217,8 @@ const DATASETS_BY_ROLE = {
 };
 
 const QUERIES = {
-  contracts: `query($t:ID!){getContracts(tenant_id:$t){contract_id title status expiry_date document_url version}}`,
+  contracts: `query($t:ID!){getContracts(tenant_id:$t){contract_id title contract_type status expiry_date document_url version}}`,
+  projects: `query($t:ID!){getProjects(tenant_id:$t){project_id code name location contract_count site_count compliance_status}}`,
   expiring: `query($t:ID!){getExpiringContracts(tenant_id:$t,withinDays:30){contract_id title status expiry_date}}`,
   finance: `query($t:ID!){getFinanceRecords(tenant_id:$t){finance_id invoice_number amount gst_filing_status tds_status ra_bill_status due_date paid_date}}`,
   safety: `query($t:ID!){getSafetyAudits(tenant_id:$t){safety_id site_name checklist_status ppe_compliance audit_date}}`,
@@ -240,6 +251,7 @@ const QUERIES = {
 
 const FIELD_OF = {
   contracts: "getContracts",
+  projects: "getProjects",
   expiring: "getExpiringContracts",
   finance: "getFinanceRecords",
   safety: "getSafetyAudits",
@@ -271,6 +283,7 @@ const FIELD_OF = {
 
 const EMPTY = {
   contracts: [],
+  projects: [],
   expiring: [],
   finance: [],
   safety: [],
@@ -500,10 +513,11 @@ function Dashboard({ session, onLogout }) {
       { label: tr("qa.logSafety"), onClick: () => setModal("safety") },
     ],
     ACCOUNTANT: [{ label: tr("qa.newFinance"), onClick: () => setModal("finance") }],
-    PROJECT_MANAGER: [{ label: tr("qa.newContract"), onClick: () => setModal("contract") }],
+    PROJECT_MANAGER: [{ label: tr("qa.newContract"), onClick: () => setModal("contract") }, { label: tr("qa.newProject"), onClick: () => setModal("project") }],
     ADMIN: [
       { label: tr("qa.newContract"), onClick: () => setModal("contract") },
       { label: tr("qa.newFinance"), onClick: () => setModal("finance") },
+      { label: tr("qa.newProject"), onClick: () => setModal("project") },
     ],
     COMPLIANCE_OFFICER: [],
     CONTRACTOR: [{ label: tr("qa.newDPR"), onClick: () => setModal("dpr") }],
@@ -569,6 +583,7 @@ function Dashboard({ session, onLogout }) {
           {tab === "home" && home}
           {tab === "map" && <ProjectMap sites={data.sites} />}
           {tab === "compliance" && <ComplianceModule data={data} />}
+          {tab === "projects" && <ProjectsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} />}
           {tab === "reports" && <ReportsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} />}
           {tab === "approvals" && <ApprovalsModule data={data} loading={loading} errors={dataErrors} onRetry={refresh} mutate={mutate} role={user.role} />}
           {tab === "audit" && <AuditModule data={data} />}
@@ -637,6 +652,12 @@ function Dashboard({ session, onLogout }) {
       />
       <ContractModal
         open={modal === "contract"}
+        onClose={() => setModal(null)}
+        tenantId={user.tenant_id}
+        onDone={refresh}
+      />
+      <ProjectModal
+        open={modal === "project"}
         onClose={() => setModal(null)}
         tenantId={user.tenant_id}
         onDone={refresh}

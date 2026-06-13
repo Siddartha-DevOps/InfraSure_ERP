@@ -40,11 +40,25 @@ export const typeDefs = /* GraphQL */ `
   type Contract {
     contract_id: ID!
     tenant_id: ID!
+    project_id: ID
     title: String!
+    contract_type: String!
     expiry_date: String!
     status: String!
     document_url: String
     version: Int!
+  }
+
+  # A project groups contracts + sites; compliance_status is a 🟢/🟡/🔴 roll-up.
+  type Project {
+    project_id: ID!
+    tenant_id: ID!
+    code: String!
+    name: String!
+    location: String
+    contract_count: Int!
+    site_count: Int!
+    compliance_status: String! # COMPLIANT | PENDING | NON_COMPLIANT
   }
 
   type Finance {
@@ -297,6 +311,7 @@ export const typeDefs = /* GraphQL */ `
     getTenant(tenant_id: ID!): Tenant
     getUsers(tenant_id: ID!): [User!]!
     getContracts(tenant_id: ID!): [Contract!]!
+    getProjects(tenant_id: ID!): [Project!]!
     # Contracts expiring within the given window (default 30 days) — expiry alerts.
     getExpiringContracts(tenant_id: ID!, withinDays: Int = 30): [Contract!]!
     getFinanceRecords(tenant_id: ID!): [Finance!]!
@@ -351,8 +366,17 @@ export const typeDefs = /* GraphQL */ `
     ): AuthPayload!
     login(email: String!, password: String!): AuthPayload!
 
+    # --- Projects ---
+    createProject(tenant_id: ID!, code: String!, name: String!, location: String): Project!
+
     # --- Contracts ---
-    createContract(tenant_id: ID!, title: String!, expiry_date: String!): Contract!
+    createContract(
+      tenant_id: ID!
+      title: String!
+      expiry_date: String!
+      contract_type: String
+      project_id: ID
+    ): Contract!
     updateContractStatus(tenant_id: ID!, contract_id: ID!, status: String!): Contract!
 
     # --- Finance ---
